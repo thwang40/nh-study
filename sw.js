@@ -1,4 +1,4 @@
-const SHELL = 'nh-shell-v6', AUDIO = 'nh-audio-v4', PAGES = 'nh-pages-v1';
+const SHELL = 'nh-shell-v7', AUDIO = 'nh-audio-v5', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'];
 self.window = self; importScripts('data.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));

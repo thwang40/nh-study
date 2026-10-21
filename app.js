@@ -9,6 +9,13 @@ function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} updateChips(); }
 const DLG = {}; B.dialogues.forEach(d => DLG[d.id] = d);
 const LESSON = {}; B.lessons.forEach(l => LESSON[l.n] = l);
+// 同文型聽力練習：每個文型一組例句，當成「虛擬對話」放進 DLG，播放／顯示／測驗／複習共用同一套機制
+const DRILL = {};
+Object.entries(B.drills||{}).forEach(([k, items]) => { const g = B.grammar[k]; if(!g) return;
+  const d = {id:'g'+k, l:g.l, drill:k, title:'同文型練習「'+g.p+'」', scene:g.zh,
+    sp:{A:{name:'女',voice:'f'}, B:{name:'男',voice:'m'}},
+    lines: items.map(it => ({s: it.v==='m'?'B':'A', ja:it.ja, kana:it.kana, zh:it.zh, g:[k], v:[], x:it.x||null}))};
+  DRILL[k] = d; DLG[d.id] = d; });
 const UNCERTAIN = {};
 const isText = d => !!d.src;
 const srcTag = d => d.src ? `課本原文・${d.src.label}・p.${d.src.page}` : '實用會話（自編）';
@@ -41,8 +48,9 @@ function stopAll(){
 }
 function setPlaying(key){
   curPlaying = key;
-  document.querySelectorAll('.line.playing').forEach(e=>e.classList.remove('playing'));
-  if(key){ const el = document.querySelector(`.line[data-key="${key}"]`); if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
+  document.querySelectorAll('.line.playing,.dline.playing').forEach(e=>e.classList.remove('playing'));
+  document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
+  if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
 }
 function speakTTS(text, token){
@@ -98,7 +106,36 @@ function gLabel(key){
   return (l==='0' ? `生活の言葉${n}「${g.p}」` : `第${l}課・文型${n}「${g.p}」`) + (g.pg ? ` p.${g.pg}` : '');
 }
 function vLabel(w){ const v = B.vocab[w]; if(!v) return ''; return v.l==='補' ? '補充單字' : lessonLabel(v.l); }
+function drillSrcHTML(d, i){
+  const ln = d.lines[i], k = d.drill, g = B.grammar[k];
+  let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${esc(gLabel(k))}</div>`;
+  h += `<div style="margin-top:4px"><span class="tag">同文型練習</span> 本 App 依此文型自編例句（只用${d.l?`第${d.l}課及之前`:'生活の言葉'}的文型與單字）・第${i+1}句</div>`;
+  h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`;
+  if(ln.x && ln.x.length) h += `<div style="margin-top:6px"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
+  return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">🎧 這個文型的全部練習 ›</a></div></div>`;
+}
+function drillLineHTML(d, i){
+  return `<div class="dline" data-key="${d.id}:${i}" data-d="${d.id}" data-i="${i}" data-lv="0"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><div class="dtext">${drillTextHTML(d, i, 0)}</div></div>`;
+}
+function drillTextHTML(d, i, lv){
+  const ln = d.lines[i];
+  if(lv<1) return `<button class="hiddenText" data-act="drv">👂 先聽聽看… 點這裡顯示日文</button>`;
+  let h = `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`;
+  if(lv<2) return h + `<button class="btn sm ghost" data-act="drv">顯示中文</button>`;
+  h += `<div class="zh">${esc(ln.zh)}</div>`;
+  if(ln.x && ln.x.length) h += `<div class="small mute">補充單字：${ln.x.map(e=>esc(e.w+'（'+e.r+'）＝'+e.zh)).join('、')}</div>`;
+  return h;
+}
+function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速度"><button data-act="spd" data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-act="spd" data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>`; }
+function drillsHTML(keys, skip){
+  keys = keys.filter(k => DRILL[k] && k !== skip); if(!keys.length) return '';
+  return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
+    return `<details class="drill" ${n===0?'open':''}><summary>${esc(gLabel(k))}（${d.lines.length} 句）</summary>
+    <div class="row drillbar"><button class="btn sm" data-act="dall" data-d="${d.id}">▶ 全部播放</button>${speedSegHTML()}<a class="btn sm ghost" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗</a><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">全頁 ›</a></div>
+    <div class="dlines">${d.lines.map((_, i) => drillLineHTML(d, i)).join('')}</div></details>`; }).join('') + `</div>`;
+}
 function srcHTML(d, i){
+  if(d.drill) return drillSrcHTML(d, i);
   const ln = d.lines[i]; const L = LESSON[d.l];
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》第${d.l}課「${esc(L.t)}」（${esc(L.zh)}）</div>`;
   h += d.src ? `<div style="margin-top:4px"><span class="tag txt">課本原文</span> 第${d.l}課・${esc(d.src.label)}「${esc(d.title)}」<b>p.${d.src.page}</b>・第${i+1}句</div>`
@@ -113,6 +150,7 @@ function srcHTML(d, i){
       return `<span>${esc(w)}${v.r!==w?`（${esc(v.r)}）`:''}＝${esc(v.zh)} <em>${esc(vLabel(w))}</em></span>`; }).join('') + `</div>`;
   }
   if(ln.note) h += `<div class="small" style="margin-top:6px">💡 ${esc(ln.note)}</div>`;
+  h += drillsHTML(ln.g);
   return h + `</div>`;
 }
 function addReview(d, i, why){
@@ -159,7 +197,7 @@ function viewHome(){
     <div><b>電腦（Chrome / Edge）</b>：網址列右側的「安裝」圖示，或直接用書籤。</div>
     <div class="mute" style="margin-top:4px">第一次開啟後，音檔會自動存到裝置，之後沒網路也能播放（可在 ⚙︎ 設定中檢查）。</div>
   </div>
-  <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:青山龍星）。僅供個人學習使用。</div>`;
+  <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:雀松朱司）。僅供個人學習使用。</div>`;
 }
 
 function viewLesson(n){
@@ -178,12 +216,34 @@ function viewLesson(n){
   <h2>🎧 實用會話（依本課文型自編）</h2>
   <div class="dlist">${ds.filter(d=>!isText(d)).map(dCard).join('')}</div>
   <div class="row" style="margin-top:10px"><a class="btn" style="text-decoration:none" href="#/q/L${n}">✏️ 第${n}課 聽力測驗</a></div>
+  <h2 id="drills">🎧 同文型聽力練習（${gs.length} 個文型）</h2>
+  <div class="glinks">${gs.concat(n===1?Object.entries(B.grammar).filter(([k,g])=>g.l===0):[]).map(([k,g])=>`<a class="card glink" href="#/g/${k}"><b>${esc(gLabel(k))}</b><span class="small mute">${DRILL[k]?DRILL[k].lines.length:0} 句・${S.quiz['g'+k]!=null?`測驗 ${S.quiz['g'+k]}%`:'聽力＋小測驗'}</span></a>`).join('')}</div>
   ${pagesSection(L)}
-  <details ${gs.length<=0?'':''}><summary>📚 本課文型（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>`<div class="g"><b>${esc(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div></div>`).join('')}</div></details>
-  ${n===1?`<details><summary>📚 生活の言葉（第1課前）</summary><div class="gl">${Object.entries(B.grammar).filter(([k,g])=>g.l===0).map(([k,g])=>`<div class="g"><b>${esc(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div></div>`).join('')}</div></details>`:''}
+  <details ${gs.length<=0?'':''}><summary>📚 本課文型（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>
+  ${n===1?`<details><summary>📚 生活の言葉（第1課前）</summary><div class="gl">${Object.entries(B.grammar).filter(([k,g])=>g.l===0).map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>`:''}
   <div class="row" style="margin-top:14px">${n>1?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n-1}">‹ 第${n-1}課</a>`:''}${n<12?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n+1}">第${n+1}課 ›</a>`:''}</div>`;
 }
 
+function gItemHTML(k, g){ return `<div class="g"><b>${esc(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
+function viewDrill(k){
+  const d = DRILL[k]; if(!d) return viewHome();
+  const g = B.grammar[k], n = d.l, L = LESSON[n];
+  renderSide(n || 1); reveal = {};
+  const keys = Object.keys(DRILL), pos = keys.indexOf(k), prevK = keys[pos-1], nextK = keys[pos+1];
+  current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
+  $('#view').innerHTML = `
+  <div class="crumb"><a href="#/">首頁</a> › ${L?`<a href="#/l/${n}">第${n}課 ${esc(L.t)}</a>`:`<a href="#/l/1">生活の言葉</a>`} › 同文型練習</div>
+  <div class="small"><span class="badge">同文型聽力練習（自編例句）</span></div>
+  <h1>🎧 ${esc(gLabel(k))}</h1>
+  <div class="scene">💡 ${esc(g.zh)}<br><span class="small">課本例句（p.${g.pg}）：${esc(g.ex)}</span></div>
+  ${playerHTML()}
+  <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
+  <div class="row" style="margin-top:14px">
+    <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗：聽到的是哪一句？／意思是？</a>
+  </div>
+  <div class="row" style="margin-top:8px">${prevK?`<a class="btn ghost" style="text-decoration:none" href="#/g/${prevK}">‹ 上一個文型</a>`:''}${nextK?`<a class="btn ghost" style="text-decoration:none" href="#/g/${nextK}">下一個文型 ›</a>`:''}</div>`;
+  bindPlayer();
+}
 function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
@@ -250,7 +310,7 @@ function lineHTML(d, i, opts={}){
   const lv = S.listenFirst ? (reveal[key]||0) : 2;
   const inRev = !!S.review[key];
   return `<div class="line" data-key="${key}">
-    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${opts.showId?`${d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
+    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${opts.showId?`${d.drill?`文型${d.drill} 練習`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
       <div class="lbtns"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><button class="ibtn" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次">🔁</button></div></div>
     ${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
     ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}
@@ -341,7 +401,7 @@ function buildQuiz(scope){
   return items.map(([d,i], qi) => {
     const ln = d.lines[i]; const type = qi % 2 === 0 ? 'hear' : 'mean';
     const field = type==='hear' ? 'ja' : 'zh';
-    const near = shuffle(pool.filter(p => p.ln[field] !== ln[field] && Math.abs(p.d.l - d.l) <= 1));
+    const near = d.drill ? shuffle(d.lines.map((l2,i2)=>({d,i:i2,ln:l2})).filter(p => p.ln[field] !== ln[field])).concat(shuffle(Object.values(DRILL).filter(x=>x!==d && x.l===d.l).flatMap(x=>x.lines.map((l2,i2)=>({d:x,i:i2,ln:l2}))))) : shuffle(pool.filter(p => p.ln[field] !== ln[field] && Math.abs(p.d.l - d.l) <= 1));
     const far = shuffle(pool.filter(p => p.ln[field] !== ln[field]));
     const opts = []; const seen = new Set([ln[field]]);
     for(const p of near.concat(far)){ if(opts.length>=3) break; if(!seen.has(p.ln[field])){ seen.add(p.ln[field]); opts.push(p.ln[field]); } }
@@ -353,6 +413,7 @@ function viewQuiz(scope){
   let back = '#/', backName = '首頁', title = '聽力測驗';
   if(scope==='review'){ back='#/review'; backName='複習清單'; title='複習測驗'; renderSide('review'); }
   else if(scope[0]==='L'){ const n=+scope.slice(1); back=`#/l/${n}`; backName=`第${n}課`; title=`第${n}課 聽力測驗`; renderSide(n); }
+  else if(DLG[scope] && DLG[scope].drill){ const k=DLG[scope].drill; back=`#/g/${k}`; backName='同文型練習'; title=`${gLabel(k)} 小測驗`; renderSide(DLG[scope].l||1); }
   else if(DLG[scope]){ back=`#/d/${scope}`; backName=`對話 ${scope}`; title=`${DLG[scope].src?`第${DLG[scope].l}課${DLG[scope].src.label}`:'對話 '+scope}「${DLG[scope].title}」測驗`; renderSide(DLG[scope].l); }
   if(!qs.length){ $('#view').innerHTML = `<div class="crumb"><a href="${back}">‹ ${backName}</a></div><div class="card">沒有可以出題的句子。</div>`; return; }
   Q = {scope, qs, idx:0, score:0, back, backName, title};
@@ -424,6 +485,9 @@ document.addEventListener('click', e => {
     document.getElementById('src-'+k.replace(':','_')).innerHTML = srcHTML(d, i);
     toast('已加入複習清單');
   }
+  else if(act==='drv'){ const el = b.closest('.dline'); const lv = Math.min(2, +el.dataset.lv + 1); el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
+  else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
+  else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
   else if(act==='pgcache'){ cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
@@ -433,7 +497,7 @@ $('#sheet').addEventListener('click', e => { if(e.target.id==='sheet') closeShee
 function closeSheet(){ $('#sheet').classList.add('hidden'); }
 async function cacheStatus(){
   if(!('caches' in window)) return '此瀏覽器不支援離線快取';
-  try{ const ks = await caches.keys(); let n=0; for(const k of ks){ const c = await caches.open(k); const r = await c.keys(); n += r.filter(x=>/\.mp3$/.test(x.url)).length; } return `已離線儲存音檔：${n} / ${B.dialogues.reduce((a,d)=>a+d.lines.length*2,0)}`; }catch(e){ return '無法讀取快取狀態'; }
+  try{ const ks = await caches.keys(); let n=0; for(const k of ks){ const c = await caches.open(k); const r = await c.keys(); n += r.filter(x=>/\.mp3$/.test(x.url)).length; } return `已離線儲存音檔：${n} / ${B.dialogues.concat(Object.values(DRILL)).reduce((a,d)=>a+d.lines.length*2,0)}`; }catch(e){ return '無法讀取快取狀態'; }
 }
 async function openSettings(){
   $('#sheetBody').innerHTML = `<h2 style="margin-top:0">⚙︎ 設定</h2>
@@ -444,7 +508,7 @@ async function openSettings(){
     <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部音檔</button></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 2.2（語音改為 VOICEVOX，修正重音與疑問句語調）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 2.3（加入同文型聽力練習）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').textContent = await cacheStatus();
@@ -452,8 +516,8 @@ async function openSettings(){
   document.querySelectorAll('[data-kana]').forEach(b => b.onclick = () => { S.showKana = b.dataset.kana==='1'; save(); openSettings(); route(); });
   $('#dlAll').onclick = async () => {
     if(!('caches' in window)) return toast('不支援');
-    const urls = B.dialogues.flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
-    const c = await caches.open('nh-audio-v4'); let n=0;
+    const urls = B.dialogues.concat(Object.values(DRILL)).flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
+    const c = await caches.open('nh-audio-v5'); let n=0;
     for(const u of urls){ try{ if(!(await c.match(u))) await c.add(u); }catch(e){} n++; if(n%20===0) $('#cacheInfo').textContent = `下載中… ${n}/${urls.length}`; }
     $('#cacheInfo').textContent = await cacheStatus();
   };
@@ -471,6 +535,7 @@ function route(){
   if(a==='l') viewLesson(+b);
   else if(a==='d') viewDialogue(b);
   else if(a==='q') viewQuiz(b);
+  else if(a==='g') viewDrill(b);
   else if(a==='review') viewReview();
   else if(a==='p') viewPage(+b, +(h.split('/')[2]||0));
   else viewHome();

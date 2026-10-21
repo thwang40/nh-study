@@ -22,6 +22,7 @@ h2{font-size:17px;margin:16px 0 8px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 1px 2px #0000000d}
 a.card{text-decoration:none;display:block}
+a.card.glink{display:flex}
 .lnum{font-size:12px;color:var(--red);font-weight:700}
 .ltitle{font-size:15px;font-weight:600;margin:2px 0}
 .bar{height:6px;background:#f1e6da;border-radius:6px;overflow:hidden;margin-top:8px}
@@ -113,3 +114,16 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .pvstrip a.cur{background:var(--red,#be1e2d);color:#fff;border-color:transparent}
 @media (min-width:840px){.thumbs{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
 .pvwrap img{aspect-ratio:1200/1714}
+/* 同文型聽力練習 */
+.drills{margin-top:6px;border-top:1px dashed var(--line,#ddd);padding-top:4px}
+.drill{margin:6px 0;border:1px solid var(--line,#ddd);border-radius:12px;padding:6px 10px;background:rgba(255,255,255,.55)}
+.drill>summary{cursor:pointer;font-weight:700;font-size:14px;padding:4px 0}
+.drillbar{margin:6px 0;gap:6px;flex-wrap:wrap}
+.dlines{display:grid;gap:6px}
+.dline{display:flex;gap:8px;align-items:flex-start;padding:6px;border-radius:10px;background:rgba(0,0,0,.03)}
+.dline .dtext{flex:1;min-width:0}
+.dline .dtext .ja{font-size:17px}
+.dline .hiddenText{width:100%;margin:0}
+.dline.playing{box-shadow:0 0 0 2px var(--red);background:#be1e2d0d}
+.glinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:10px}
+.glink{display:flex;flex-direction:column;gap:2px;text-decoration:none;padding:10px 12px}
