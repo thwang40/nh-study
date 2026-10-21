@@ -1,0 +1,17 @@
+{
+  "name": "文化日本語 聽力練習（第1～12課）",
+  "short_name": "日語聽力",
+  "description": "文化初級日本語Ⅰ 第1～12課 課本本文＋實用會話聽力練習，附出處（課・文型・頁碼）提示與複習清單。",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fff8f0",
+  "theme_color": "#be1e2d",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
