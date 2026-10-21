@@ -1,11 +1,11 @@
-const SHELL = 'nh-shell-v5', AUDIO = 'nh-audio-v3', PAGES = 'nh-pages-v1';
+const SHELL = 'nh-shell-v6', AUDIO = 'nh-audio-v4', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'];
 self.window = self; importScripts('data.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));
 async function cacheAudio(){
   const c = await caches.open(AUDIO);
   for (let i = 0; i < AUDIO_FILES.length; i += 10) {
-    await Promise.allSettled(AUDIO_FILES.slice(i, i + 10).map(async u => { if (!(await c.match(u))) await c.add(u); }));
+    await Promise.allSettled(AUDIO_FILES.slice(i, i + 10).map(async u => { if (!(await c.match(u))) { const r = await fetch(u, {cache: 'no-cache'}); if (r.ok) await c.put(u, r); } }));
   }
 }
 self.addEventListener('install', e => {
@@ -37,7 +37,7 @@ self.addEventListener('fetch', e => {
       const hit = await c.match(url.pathname.replace(/^.*\/audio\//, 'audio/')) || await c.match(e.request);
       if (hit) return rangeResponse(e.request, hit);
       try {
-        const full = await fetch(url.pathname, {credentials: 'same-origin'});
+        const full = await fetch(url.pathname, {credentials: 'same-origin', cache: 'no-cache'});
         if (full.ok && full.status === 200) { await c.put(url.pathname.replace(/^.*\/audio\//, 'audio/'), full.clone()); return rangeResponse(e.request, full); }
       } catch (err) {}
       return fetch(e.request);

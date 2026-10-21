@@ -73,7 +73,7 @@ async function playLine(d, i, token){
   const ln = d.lines[i];
   if(S.engine === 'mp3'){
     try{ await playMP3(`audio/${d.id}_${i}${S.speed<1?'_s':''}.mp3`, token); }
-    catch(e){ if(token !== playToken) return false; await speakTTS(ln.ja, token); }
+    catch(e){ if(token !== playToken) return false; toast('MP3 載入失敗，改用裝置語音'); await speakTTS(ln.ja, token); }
   } else { await speakTTS(ln.ja, token); }
   if(token !== playToken) return false;
   setPlaying(null); return true;
@@ -159,7 +159,7 @@ function viewHome(){
     <div><b>電腦（Chrome / Edge）</b>：網址列右側的「安裝」圖示，或直接用書籤。</div>
     <div class="mute" style="margin-top:4px">第一次開啟後，音檔會自動存到裝置，之後沒網路也能播放（可在 ⚙︎ 設定中檢查）。</div>
   </div>
-  <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD）。僅供個人學習使用。</div>`;
+  <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:青山龍星）。僅供個人學習使用。</div>`;
 }
 
 function viewLesson(n){
@@ -439,12 +439,12 @@ async function openSettings(){
   $('#sheetBody').innerHTML = `<h2 style="margin-top:0">⚙︎ 設定</h2>
   <div class="card" style="display:grid;gap:12px">
     <div><b>語音來源</b><div class="seg" style="margin-top:6px"><button data-eng="mp3" class="${S.engine==='mp3'?'on':''}">預錄 MP3（建議）</button><button data-eng="tts" class="${S.engine==='tts'?'on':''}">裝置語音</button></div>
-      <div class="small mute">MP3 為 AI 合成的日語語音，離線可播。裝置語音使用手機/電腦內建 ja-JP 語音${jaVoice?`（目前：${esc(jaVoice.name)}）`:'（尚未偵測到日語語音）'}。</div></div>
+      <div class="small mute">MP3 為 AI 合成的日語語音（VOICEVOX，依標準重音調整），離線可播。裝置語音使用手機/電腦內建 ja-JP 語音${jaVoice?`（目前：${esc(jaVoice.name)}）`:'（尚未偵測到日語語音）'}。</div></div>
     <div><b>顯示假名讀音</b><div class="seg" style="margin-top:6px"><button data-kana="1" class="${S.showKana?'on':''}">顯示</button><button data-kana="0" class="${!S.showKana?'on':''}">隱藏</button></div></div>
     <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部音檔</button></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 2.1（加入課本頁面）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 2.2（語音改為 VOICEVOX，修正重音與疑問句語調）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').textContent = await cacheStatus();
@@ -453,7 +453,7 @@ async function openSettings(){
   $('#dlAll').onclick = async () => {
     if(!('caches' in window)) return toast('不支援');
     const urls = B.dialogues.flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
-    const c = await caches.open('nh-audio-v3'); let n=0;
+    const c = await caches.open('nh-audio-v4'); let n=0;
     for(const u of urls){ try{ if(!(await c.match(u))) await c.add(u); }catch(e){} n++; if(n%20===0) $('#cacheInfo').textContent = `下載中… ${n}/${urls.length}`; }
     $('#cacheInfo').textContent = await cacheStatus();
   };
