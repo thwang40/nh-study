@@ -508,7 +508,7 @@ async function openSettings(){
     <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部音檔</button></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 2.3（加入同文型聽力練習）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 2.4（修正「〜ますか」重音與語調）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').textContent = await cacheStatus();
@@ -517,7 +517,7 @@ async function openSettings(){
   $('#dlAll').onclick = async () => {
     if(!('caches' in window)) return toast('不支援');
     const urls = B.dialogues.concat(Object.values(DRILL)).flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
-    const c = await caches.open('nh-audio-v5'); let n=0;
+    const c = await caches.open('nh-audio-v6'); let n=0;
     for(const u of urls){ try{ if(!(await c.match(u))) await c.add(u); }catch(e){} n++; if(n%20===0) $('#cacheInfo').textContent = `下載中… ${n}/${urls.length}`; }
     $('#cacheInfo').textContent = await cacheStatus();
   };
