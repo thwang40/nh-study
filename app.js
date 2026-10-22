@@ -187,6 +187,7 @@ function viewHome(){
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${Object.keys(S.review).length}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
+  <a class="card" href="https://thwang40.github.io/jimtof-talk/" style="text-decoration:none;display:block;margin:-4px 0 14px;border-color:#1d4e89"><b>🏭 JIMTOF 出差會話（聽力＋口說）›</b><div class="small mute">另一個網站：展覽攤位、名片、交通、晚餐、棒球的實用句，可錄音對比、跟讀、角色扮演。</div></a>
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
     return `<a class="card" href="#/l/${l.n}"><div class="lnum">第${l.n}課 ${UNCERTAIN[l.n]?'<span class="badge u">部分推定</span>':''}</div><div class="ltitle">${esc(l.t)}</div><div class="small mute">${esc(l.zh)}</div><div class="small mute">${esc(l.topic)}</div>
     <div class="bar"><i style="width:${p.pct}%"></i></div><div class="small mute" style="margin-top:4px">${p.done}/${p.total} 對話${q.length?`・測驗最佳 ${Math.max(...q)}%`:''}</div></a>`; }).join('')}</div>
