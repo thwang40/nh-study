@@ -153,6 +153,9 @@ async function playSeq(d, idxs, gap=700, repeat=1){
 function lessonLabel(l){ return l===0 ? '入門' : `第${l}課`; }
 // 文型標籤【…】另外上色
 function patHTML(t){ return esc(t).replace(/【([^】]*)】/g, '<span class="gpat">【$1】</span>'); }
+// 沒有【】的文型（標題本身就是句型，例如「動詞 て形」）：整個標題上色；入門（主題，不是句型）不上色
+function gPatHTML(k, str){ const g = B.grammar[k], t = g ? (g.t || g.p) : ''; let h = patHTML(str);
+  if(g && k[0] !== '0' && t && !/【/.test(t)) h = h.replace(esc(t), `<span class="gpat">${esc(t)}</span>`); return h; }
 function gLabel(key){
   const g = B.grammar[key]; if(!g) return key;
   const [l,n] = key.split('-');
@@ -161,7 +164,7 @@ function gLabel(key){
 function vLabel(w){ const v = B.vocab[w]; if(!v) return ''; return v.l==='補' ? '補充單字' : lessonLabel(v.l); }
 function drillSrcHTML(d, i){
   const ln = d.lines[i], k = d.drill, g = B.grammar[k];
-  let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${patHTML(gLabel(k))}</div>`;
+  let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${gPatHTML(k, gLabel(k))}</div>`;
   h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${patHTML(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${lineNo(d,i).pre?`・${esc(lineNo(d,i).pre)}`:''}・${esc(lineNo(d,i).lab)}</div>`;
   h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div></div>`;
   if(ln.x && ln.x.length) h += `<div class="srch"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
@@ -183,7 +186,7 @@ function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速�
 function drillsHTML(keys, skip){
   keys = keys.filter(k => DRILL[k] && k !== skip); if(!keys.length) return '';
   return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">課本文型例句（標頁碼），先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
-    return `<details class="drill" data-blk ${n===0?'open':''}><summary>${patHTML(gLabel(k))}（${d.lines.length} 句）</summary>
+    return `<details class="drill" data-blk ${n===0?'open':''}><summary>${gPatHTML(k, gLabel(k))}（${d.lines.length} 句）</summary>
     <div class="row drillbar"><button class="btn sm" data-act="dall" data-d="${d.id}">▶ 全部播放</button>${speedSegHTML()}<a class="btn sm ghost" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗</a><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">全頁 ›</a>${blkBtn(false)}</div>
     <div class="dlines">${d.lines.map((_, i) => drillLineHTML(d, i)).join('')}</div></details>`; }).join('') + `</div>`;
 }
@@ -193,7 +196,7 @@ function situSrcHTML(d, i){
   if(ln.g.length){
     h += `<div class="srch"><b>文型</b></div>`;
     ln.g.forEach(k => { const g = B.grammar[k]; if(!g) return;
-      h += `<div class="gent"><span class="tag">${patHTML(gLabel(k))}</span><div class="small">${esc(g.zh)}</div></div>`; });
+      h += `<div class="gent"><span class="tag">${gPatHTML(k, gLabel(k))}</span><div class="small">${esc(g.zh)}</div></div>`; });
   }
   if(ln.note) h += `<div class="small srtip">💡 ${esc(ln.note)}</div>`;
   if(ln.w && ln.w.length) h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.w.map(([w,r,zh]) => `<span>${esc(w)}${r!==w?`（${esc(r)}）`:''}＝${esc(zh)}</span>`).join('') + `</div>`;
@@ -209,7 +212,7 @@ function srcHTML(d, i){
   if(ln.g.length){
     h += `<div class="srch"><b>文型</b></div>`;
     ln.g.forEach(k => { const g = B.grammar[k]; if(!g) return;
-      h += `<div class="gent"><span class="tag">${patHTML(gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
+      h += `<div class="gent"><span class="tag">${gPatHTML(k, gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
   }
   if(ln.v.length){
     h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.v.map(w => { const v = B.vocab[w]; if(!v) return '';
@@ -322,7 +325,7 @@ function viewLesson(n){
   bindPlayer();
 }
 
-function gItemHTML(k, g){ return `<div class="g"><b>${patHTML(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
+function gItemHTML(k, g){ return `<div class="g"><b>${gPatHTML(k, gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
 // ---- 文型／同文型頁：仿課本「文型 1」排版（標題句 → 1) 2) …；A/B 子行；練習・※ 小節；表格類精簡列）----
 function drillParse(d){
   const cnt = {}; d.lines.forEach(l => { const t = (l.tag||'').trim(); cnt[t] = (cnt[t]||0) + 1; });
@@ -362,7 +365,7 @@ function viewDrill(k){
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › ${n?'同文型練習':esc(g.p)}</div>
   <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
-  <div class="hrow"><h1>🎧 ${patHTML(gLabel(k))}</h1>${bookBtnHTML(d)}</div>
+  <div class="hrow"><h1>🎧 ${gPatHTML(k, gLabel(k))}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
   <div class="script dscript" id="lines" data-blk><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span>${blkBtn(false)}</div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
@@ -374,7 +377,7 @@ function viewDrill(k){
   bindPlayer();
 }
 function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
-  return `<a class="card gcard" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${patHTML(g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
+  return `<a class="card gcard" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${gPatHTML(k, g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
 function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
@@ -1059,19 +1062,19 @@ function sqItem(o){ o.nj = sqNorm(o.ja); o.nk = sqNorm(o.kana); o.nz = sqNorm(o.
 function buildIndex(){
   const I = [];
   B.dialogues.forEach(d => d.lines.forEach((ln, i) => { if(ln.scene) return;
-    I.push(sqItem({t: d.src ? '本文' : '會話', l: d.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: d.sp[ln.s].name, pg: d.src ? d.src.page : null, src: d.src ? `${d.src.label}` : `實用會話 ${d.id}`, href: '#/d/'+d.id, key: d.id+':'+i})); }));
-  Object.values(SPLITD).forEach(v => v.lines.forEach((ln, k) => I.push(sqItem({t: '逐句', l: v.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: v.sp[ln.s].name, pg: v.src ? v.src.page : null, src: `${v.src.label}・${ln.lab}`, href: '#/d/'+v.split, key: v.id+':'+k}))));
-  Object.values(DRILL).forEach(d => d.lines.forEach((ln, i) => I.push(sqItem({t: d.l ? '文型' : '入門', l: d.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: '', pg: ln.pg, src: gLabel(d.drill).replace(/ p\.[\d・–]+$/, ''), href: '#/g/'+d.drill, key: d.id+':'+i}))));
-  Object.values(SITUD).forEach(v => v.lines.forEach((ln, k) => I.push(sqItem({t: '場合使用', l: v.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: v.sp[ln.s].name, pg: v.src.page, src: `依${v.src.label}・情境${ln.si+1}`, href: '#/d/'+v.situ, key: v.id+':'+k}))));
+    I.push(sqItem({t: d.src ? '本文' : '會話', l: d.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: d.sp[ln.s].name, pg: d.src ? d.src.page : null, src: d.src ? `${d.src.label}` : `實用會話 ${d.id}`, href: '#/d/'+d.id, key: d.id+':'+i, au: `audio/${d.id}_${i}`})); }));
+  Object.values(SPLITD).forEach(v => v.lines.forEach((ln, k) => I.push(sqItem({t: '逐句', l: v.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: v.sp[ln.s].name, pg: v.src ? v.src.page : null, src: `${v.src.label}・${ln.lab}`, href: '#/d/'+v.split, key: v.id+':'+k, au: `audio/${v.id}_${k}`}))));
+  Object.values(DRILL).forEach(d => d.lines.forEach((ln, i) => I.push(sqItem({t: d.l ? '文型' : '入門', l: d.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: '', pg: ln.pg, src: gLabel(d.drill).replace(/ p\.[\d・–]+$/, ''), href: '#/g/'+d.drill, gk: d.drill, key: d.id+':'+i, au: `audio/${d.id}_${i}`}))));
+  Object.values(SITUD).forEach(v => v.lines.forEach((ln, k) => I.push(sqItem({t: '場合使用', l: v.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: v.sp[ln.s].name, pg: v.src.page, src: `依${v.src.label}・情境${ln.si+1}`, href: '#/d/'+v.situ, key: v.id+':'+k, au: `audio/${v.id}_${k}`}))));
   const firstUse = {}; B.dialogues.forEach(d => d.lines.forEach((ln, i) => (ln.v||[]).forEach(w => { if(!firstUse[w]) firstUse[w] = [d, i]; })));
-  Object.entries(B.vocab).forEach(([w, v]) => { const f = firstUse[w];
-    I.push(sqItem({t: '單字', l: v.l, ja: w, kana: v.r, zh: v.zh, who: '', pg: null, src: vLabel(w), href: f ? '#/d/'+f[0].id : (LESSON[v.l] ? '#/l/'+v.l : '#/'), key: f ? f[0].id+':'+f[1] : null})); });
+  Object.entries(B.vocab).forEach(([w, v], vn) => { const f = firstUse[w];
+    I.push(sqItem({t: '單字', l: v.l, ja: w, kana: v.r, zh: v.zh, who: '', pg: null, src: vLabel(w), href: f ? '#/d/'+f[0].id : (LESSON[v.l] ? '#/l/'+v.l : '#/'), key: f ? f[0].id+':'+f[1] : null, au: `audio/w_${vn}`})); });
   SIDX = I; return I;
 }
 function addRPIndex(){ if(SIDX_RP || !window.RP || !SIDX) return; SIDX_RP = true;
   Object.entries(window.RP).forEach(([id, m]) => { const d = DLG[id]; if(!d) return;
     Object.entries(m).forEach(([i, [cue, alts]]) => { const ln = d.lines[+i]; if(!ln) return;
-      alts.forEach(a => SIDX.push(sqItem({t: '開口練習', l: d.l, ja: a[0], kana: a[1], zh: a[2], who: d.sp[ln.s].name, pg: d.src ? d.src.page : null, src: d.situ ? `場合使用 情境${ln.si+1}・另一種說法` : `${d.src ? d.src.label : '實用會話 '+d.id}・另一種說法`, href: '#/d/'+(d.situ||d.id), key: d.id+':'+i}))); }); }); }
+      alts.forEach((a, ai) => SIDX.push(sqItem({t: '開口練習', l: d.l, ja: a[0], kana: a[1], zh: a[2], who: d.sp[ln.s].name, pg: d.src ? d.src.page : null, src: d.situ ? `場合使用 情境${ln.si+1}・另一種說法` : `${d.src ? d.src.label : '實用會話 '+d.id}・另一種說法`, href: '#/d/'+(d.situ||d.id), key: d.id+':'+i, au: `audio/${d.id}-r_${i}_${ai}`}))); }); }); }
 const SQ_BADGE = {'本文':'txt', '逐句':'txt', '文型':'g', '入門':'g', '會話':'kw', '場合使用':'xt', '開口練習':'xt', '單字':'w'};
 const SQ_LAB = {'場合使用':'場合使用・課外', '開口練習':'開口練習・課外', '會話':'實用會話'};
 function searchFormHTML(q, cls){ return `<form class="sform${cls?' '+cls:''}" role="search" data-sform><input type="search" name="q" value="${esc(q||'')}" placeholder="搜尋日文、假名或中文（例：かいしゃ、咖啡）" aria-label="搜尋" enterkeyhint="search" autocomplete="off"><button class="btn sm" type="submit">🔍 搜尋</button></form>`; }
@@ -1085,21 +1088,51 @@ function viewSearch(q){
   const t0 = performance.now(), res = runSearch(q), nq = sqNorm(q), ms = Math.round(performance.now() - t0);
   const byL = {}; res.forEach(o => (byL[o.l] = byL[o.l] || []).push(o));
   const MAX = 400; let shown = 0;
-  const item = (o, n) => { const hitJ = o.nj.includes(nq), hitK = !hitJ && o.nk.includes(nq), hitZ = o.nz.includes(nq);
-    return `<a class="sres" href="${o.href}" data-hl="${o.key||''}" data-n="${n}"><div class="srtop"><span class="sbadge ${SQ_BADGE[o.t]}">${SQ_LAB[o.t]||o.t}</span>${o.who?`<b class="swho2">${esc(o.who)}</b>`:''}<span class="small mute">${patHTML(o.src)}${o.pg?`・p.${o.pg}`:''}</span></div>
-      <div class="ja">${hitJ ? sqHi(o.ja, nq) : esc(o.ja)}</div>${(hitK || S.showKana) && o.kana !== o.ja ? `<div class="kana">${hitK ? sqHi(o.kana, nq) : esc(o.kana)}</div>` : ''}<div class="zh">${hitZ ? sqHi(o.zh, nq) : esc(o.zh)}</div></a>`; };
+  const LM = !!S.sListen; SVIEW = []; SREV = {};
+  const item = (o, n) => {
+    const top = `<a class="sgo" href="${o.href}" data-hl="${o.key||''}"><span class="sbadge ${SQ_BADGE[o.t]}">${SQ_LAB[o.t]||o.t}</span>${o.who?`<b class="swho2">${esc(o.who)}</b>`:''}<span class="small mute">${o.gk ? gPatHTML(o.gk, o.src) : patHTML(o.src)}${o.pg?`・p.${o.pg}`:''}</span></a>`;
+    const btn = o.au ? `<button class="splay${LM?' big':''}" data-sact="play" data-sn="${n}" aria-label="播放這句" title="播放">${LM?'▶ 聽':'▶'}</button>` : '';
+    return `<div class="sres${LM?' lm':''}" data-sn="${n}"><div class="srtop">${top}${btn}</div>${LM ? `<div class="sbody" data-sact="rv" data-sn="${n}" role="button" tabindex="0">${sTextHTML(o, 0, nq)}</div>` : `<a class="sgo sbody" href="${o.href}" data-hl="${o.key||''}">${sTextHTML(o, 2, nq)}</a>`}</div>`; };
   let n = 0;
   const groups = Object.keys(byL).sort((a, b) => (isNaN(a) ? 99 : +a) - (isNaN(b) ? 99 : +b)).map(l => { const L = LESSON[l]; const list = byL[l];
-    const html = list.map(o => { if(shown >= MAX) return ''; shown++; return item(o, n++); }).join('');
+    const html = list.map(o => { if(shown >= MAX) return ''; shown++; SVIEW.push(o); return item(o, n++); }).join('');
     return `<section class="sgrp"><h2>${!L ? '補充單字' : +l ? `第${l}課　${esc(L.t)}` : esc(L.t)}<span class="small mute">（${list.length}）</span></h2>${html}</section>`; }).join('');
   $('#view').innerHTML = `<div class="crumb"><a href="#/">首頁</a> › 搜尋</div>
     <h1>🔍 搜尋</h1>${searchFormHTML(q)}
     ${!nq ? `<div class="card small mute">輸入日文（漢字或假名）或中文，按「搜尋」或 Enter。可以找本文、文型例句、實用會話、場合使用（課外）、單字。片假名、平假名都可以，例如「かいしゃ」會找到「会社」、「こーひー」會找到「コーヒー」。</div>`
-      : res.length ? `<div class="small mute scount">「${esc(q)}」共 ${res.length} 筆，分布在 ${Object.keys(byL).length} 課${res.length > MAX ? `（先顯示前 ${MAX} 筆，請再加幾個字縮小範圍）` : ''}　<span style="opacity:.6">${ms} ms</span></div>${groups}`
+      : res.length ? `<div class="scbar"><div class="small mute scount">「${esc(q)}」共 ${res.length} 筆，分布在 ${Object.keys(byL).length} 課${res.length > MAX ? `（先顯示前 ${MAX} 筆，請再加幾個字縮小範圍）` : ''}</div><div class="scbtns"><button class="bshow${LM?' on':''}" data-sact="lm" aria-pressed="${LM}">🎧 聽力模式：${LM?'開':'關'}</button><button class="bshow" data-sact="all">▶ 全部播放</button></div></div>${LM?`<div class="small mute slmtip">先聽，再點文字：第 1 次顯示日文、第 2 次加中文、第 3 次再隱藏。點上方出處可跳到課本那一句。</div>`:''}${groups}`
       : `<div class="card sempty">找不到「${esc(q)}」。<div class="small mute" style="margin-top:6px">試試看：少打幾個字、改用平假名（例：「かいしゃ」）、或用中文（例：「咖啡」）。</div></div>`}`;
   const inp = $('#view .sform input'); if(inp && !nq) setTimeout(() => inp.focus(), 50);
   if(!window.RP && nq) loadRP().then(() => { if(location.hash === '#/s/' + encodeURIComponent(q) && !SIDX_RP){ addRPIndex(); const y = scrollY; viewSearch(q); window.scrollTo(0, y); } }).catch(() => {});
 }
+let SVIEW = [], SREV = {}, sAllOn = false;
+// lv 0 = 遮住；1 = 日文＋假名；2 = 再加中文
+function sTextHTML(o, lv, nq){
+  if(!lv) return maskHTML(o.ja);
+  const hitJ = nq && o.nj.includes(nq), hitK = nq && !hitJ && o.nk.includes(nq), hitZ = nq && o.nz.includes(nq);
+  return `<div class="ja">${hitJ ? sqHi(o.ja, nq) : esc(o.ja)}</div>${(hitK || S.showKana) && o.kana !== o.ja ? `<div class="kana">${hitK ? sqHi(o.kana, nq) : esc(o.kana)}</div>` : ''}${lv > 1 ? `<div class="zh">${hitZ ? sqHi(o.zh, nq) : esc(o.zh)}</div>` : ''}`; }
+function sCurQ(){ const h = location.hash.replace(/^#\/?/, ''); try{ return decodeURIComponent(h.slice(2)); }catch(e){ return h.slice(2); } }
+function sMark(n){ document.querySelectorAll('.sres.playing').forEach(e => e.classList.remove('playing'));
+  if(n == null) return; const el = document.querySelector(`.sres[data-sn="${n}"]`); if(el){ el.classList.add('playing'); const r = el.getBoundingClientRect(); if(r.top < 70 || r.bottom > innerHeight - 20) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
+async function sPlay(n, token){
+  const o = SVIEW[n]; if(!o || !o.au) return true;
+  if(token === undefined){ stopAll(); token = playToken; }
+  sMark(n);
+  if(S.engine === 'mp3'){ try{ await playMP3(`${o.au}${S.speed<1?'_s':''}.mp3`, token); }catch(e){ if(token !== playToken) return false; await speakTTS(o.ja, token); } }
+  else await speakTTS(o.ja, token);
+  if(token !== playToken) return false; sMark(null); return true; }
+function sAllBtn(){ document.querySelectorAll('[data-sact="all"]').forEach(b => b.textContent = sAllOn ? '⏹ 停止' : '▶ 全部播放'); }
+async function sPlayAll(){
+  if(sAllOn){ sAllOn = false; stopAll(); sMark(null); sAllBtn(); return; }
+  stopAll(); const token = playToken; sAllOn = true; sAllBtn();
+  for(let n = 0; n < SVIEW.length; n++){ if(!SVIEW[n].au) continue; const ok = await sPlay(n, token); if(!ok || token !== playToken) break; await wait(600); if(token !== playToken) break; }
+  if(token === playToken){ sMark(null); } sAllOn = false; sAllBtn(); }
+document.addEventListener('click', e => { const t = e.target.closest('[data-sact]'); if(!t) return; const act = t.dataset.sact;
+  if(act === 'lm'){ S.sListen = !S.sListen; save(); sAllOn = false; stopAll(); const y = scrollY; viewSearch(sCurQ()); window.scrollTo(0, y); }
+  else if(act === 'all') sPlayAll();
+  else if(act === 'play'){ sAllOn = false; sAllBtn(); sPlay(+t.dataset.sn); }
+  else if(act === 'rv'){ const n = +t.dataset.sn, lv = ((SREV[n] || 0) + 1) % 3; SREV[n] = lv; t.innerHTML = sTextHTML(SVIEW[n], lv, sqNorm(sCurQ())); } });
+document.addEventListener('keydown', e => { if((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[data-sact="rv"]')){ e.preventDefault(); e.target.click(); } });
 let pendingHL = null;
 function applyHL(){
   const k = pendingHL; pendingHL = null; if(!k) return;
@@ -1112,7 +1145,7 @@ function applyHL(){
 document.addEventListener('submit', e => { const f = e.target.closest('[data-sform]'); if(!f) return; e.preventDefault();
   const q = f.querySelector('input').value.trim(); const h = '#/s/' + encodeURIComponent(q); f.querySelector('input').blur();
   if(location.hash === h) route(); else location.hash = h; });
-document.addEventListener('click', e => { const a = e.target.closest('a.sres'); if(!a) return; pendingHL = a.dataset.hl || null;
+document.addEventListener('click', e => { const a = e.target.closest('a.sgo'); if(!a) return; pendingHL = a.dataset.hl || null;
   if(location.hash === a.getAttribute('href')){ e.preventDefault(); route(); } });
 
 /* ---------------- router ---------------- */
@@ -1132,7 +1165,7 @@ function route(){
   updateChips(); window.scrollTo(0,0);
   if(pendingHL) setTimeout(applyHL, 60);
 }
-window.addEventListener('hashchange', () => { S.listenFirst = true; reveal = {}; route(); syncBookPanel(); });
+window.addEventListener('hashchange', () => { if(sAllOn){ sAllOn = false; stopAll(); } S.listenFirst = true; reveal = {}; route(); syncBookPanel(); });
 /* ---------------- page-view counter (footer) ----------------
    Abacus (https://abacus.jasoncameron.dev): free, no signup, CORS *. /hit creates the key on first use and returns {value}.
    Counted once per page load (not per hash route). Daily key uses the Asia/Taipei date. Offline or any error: show nothing. */
@@ -1160,6 +1193,13 @@ route();
 setTimeout(countView, 1500); // after first render; never blocks the app
 
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  // 新版上線後盡快生效：sw.js 不走 HTTP 快取、回到頁面時檢查更新；新版接手後自動重新整理一次（第一次安裝不重整）
+  const hadCtl = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if(!hadCtl || reloaded) return; reloaded = true; location.reload(); });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg => {
+    const chk = () => reg.update().catch(()=>{});
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') chk(); });
+    setInterval(chk, 30*60*1000);
+  }).catch(()=>{}));
 }
 })();
