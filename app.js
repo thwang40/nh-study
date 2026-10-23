@@ -184,6 +184,22 @@ function srcHTML(d, i){
   h += drillsHTML(ln.g);
   return h + `</div>`;
 }
+function srcPanelHTML(d, i){
+  const k = d.id+':'+i;
+  return `<div class="srcwrap"><button class="srcx top" data-act="srcclose" data-k="${k}" aria-label="收起出處">收起 ▲</button>${srcHTML(d, i)}<button class="srcx bot" data-act="srcclose" data-k="${k}" aria-label="收起出處">收起 ▲</button></div>`;
+}
+function setIdk(el, open){ if(!el) return; el.classList.toggle('srcopen', open); el.querySelectorAll('[data-act="idk"]').forEach(x=>{ x.setAttribute('aria-expanded', open?'true':'false'); x.classList.toggle('on', open); x.title = open ? '收起出處' : '我不會'; }); }
+function openSrc(d, i){
+  const k = d.id+':'+i, sb = document.getElementById('src-'+k.replace(':','_')); if(!sb) return;
+  sb.innerHTML = srcPanelHTML(d, i);
+  const w = sb.querySelector('.srcwrap'); if(w && w.offsetHeight > 260) w.classList.add('long');
+  setIdk(sb.closest('.line'), true);
+}
+function closeSrc(k, fromBottom){
+  const sb = document.getElementById('src-'+k.replace(':','_')); if(!sb) return;
+  const el = sb.closest('.line'); sb.innerHTML = ''; setIdk(el, false);
+  if(fromBottom && el){ const r = el.getBoundingClientRect(); if(r.top < 60) window.scrollBy(0, r.top - 80); }
+}
 function addReview(d, i, why){
   const k = d.id + ':' + i; const r = S.review[k] || {n:0};
   r.n++; r.t = Date.now(); r.why = why; S.review[k] = r; save();
@@ -311,7 +327,7 @@ function viewDrill(k){
   bindPlayer();
 }
 function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
-  return `<a class="card" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
+  return `<a class="card gcard" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
 function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
@@ -568,7 +584,9 @@ function rerenderLine(d, i, opts){
   const box = el.querySelector('.srcbox').innerHTML;
   if(el.classList.contains('drow')){ const tmp = document.createElement('div'); tmp.innerHTML = drillRowHTML(d, i); el.replaceWith(tmp.querySelector('.drow')); }
   else el.outerHTML = el.classList.contains('srow') ? rowHTML(d, i) : lineHTML(d, i, opts);
-  const nel = document.querySelector(`.line[data-key="${key}"]`); nel.querySelector('.srcbox').innerHTML = box;
+  const nel = document.querySelector(`.line[data-key="${key}"]`);
+  // hidden again (tap cycle back to 0) → its info panel closes too
+  if(box && !(S.listenFirst && !(reveal[key]||0))){ nel.querySelector('.srcbox').innerHTML = box; setIdk(nel, true); }
 }
 function bindPlayer(){
   const pb = $('#playAllBtn');
@@ -697,11 +715,14 @@ document.addEventListener('click', e => {
   else if(act==='rv'){ const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
   else if(act==='idk'){
     const d = DLG[b.dataset.d], i = +b.dataset.i, k = d.id+':'+i;
+    const sb = document.getElementById('src-'+k.replace(':','_'));
+    if(sb && sb.innerHTML.trim()){ closeSrc(k); return; }   // 2nd 🙋 closes the panel
     reveal[k] = 2; addReview(d, i, '我不會');
     rerenderLine(d, i, current&&current.type==='review'?{review:true,showId:true}:{});
-    document.getElementById('src-'+k.replace(':','_')).innerHTML = srcHTML(d, i);
+    openSrc(d, i);
     toast('已加入複習清單');
   }
+  else if(act==='srcclose'){ closeSrc(b.dataset.k, b.classList.contains('bot')); }
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = (+el.dataset.lv + 1) % 3; el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }

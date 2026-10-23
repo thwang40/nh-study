@@ -278,3 +278,23 @@ body.has-pside .igimg .illb img{max-width:108px;max-height:96px}
   .ufam{left:0;top:0;width:34px;height:36px}
   .ufam input{width:19px;height:19px}
 }
+
+/* 出處 panel: collapsible */
+.srcwrap{position:relative}
+.srcwrap .src{padding-top:12px}
+.srcx{position:absolute;right:6px;top:14px;z-index:1;border:1px solid #cfe0f7;background:#fff;color:var(--blue);border-radius:999px;font-size:12px;padding:3px 10px;min-height:28px;cursor:pointer;font-family:inherit}
+.srcx:hover{background:#e8f1ff}
+.srcx.bot{display:none;position:static;margin:6px 0 0 auto}
+.srcwrap.long .srcx.bot{display:block}
+.srcwrap .src > div:first-child{padding-right:76px}
+[data-act="idk"].on{opacity:1;background:#e8f1ff;border-radius:8px}
+@media (max-width:560px){ .srcx{min-height:32px;padding:4px 12px} }
+
+/* lesson list: 文型 cards nested under the preceding 本文 */
+.dlist .gcard{margin-left:34px;position:relative}
+.dlist .gcard::before{content:"";position:absolute;left:-20px;top:-8px;bottom:50%;width:14px;border-left:2px solid #e3cf98;border-bottom:2px solid #e3cf98;border-bottom-left-radius:8px;pointer-events:none}
+.dlist .gcard + .gcard::before{top:-30px}
+@media (max-width:560px){
+  .dlist .gcard{margin-left:18px}
+  .dlist .gcard::before{left:-13px;width:9px}
+}
