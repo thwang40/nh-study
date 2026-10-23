@@ -257,7 +257,7 @@ body.has-pside .igimg .illb img{max-width:108px;max-height:96px}
   .script .ill .illb{flex:0 0 auto}
   .script .ill .illb img{width:auto;max-height:220px;max-width:calc(100vw - 72px)}
   .script .ill .illcap{display:none}
-  .igrp,body.has-pside .igrp{display:flex;flex-direction:column-reverse}
+  .igrp,body.has-pside .igrp{display:flex;flex-direction:column-reverse;align-items:stretch}
   .igrp.noimg .igimg{display:none}
   .igimg{flex-direction:row;justify-content:flex-start;padding:4px 8px 0;align-items:flex-start}
   .igimg .illb img,body.has-pside .igimg .illb img,.igimg.two .illb img{max-height:100px;max-width:44vw}
