@@ -71,7 +71,7 @@ function setPlaying(key){
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
-  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.drill ? gLabel(d.drill).replace(/「.*」/,'') : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・第${+i+1}句` : ''; } // no Japanese text here: listening first
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・第${+i+1}句` : ''; } // no Japanese text here: listening first
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -119,11 +119,11 @@ async function playSeq(d, idxs, gap=700, repeat=1){
 }
 
 /* ---------------- helpers ---------------- */
-function lessonLabel(l){ return l===0 ? '生活の言葉（第1課前）' : `第${l}課`; }
+function lessonLabel(l){ return l===0 ? '入門' : `第${l}課`; }
 function gLabel(key){
   const g = B.grammar[key]; if(!g) return key;
   const [l,n] = key.split('-');
-  return (l==='0' ? `生活の言葉${n}「${g.p}」` : `第${l}課・文型${n}「${g.p}」`) + (g.pg ? ` p.${g.pg}` : '');
+  return (l==='0' ? `入門・${g.p}` : `第${l}課・文型${n} ${g.t||g.p}`) + (g.pg ? ` p.${g.pg}` : '');
 }
 function vLabel(w){ const v = B.vocab[w]; if(!v) return ''; return v.l==='補' ? '補充單字' : lessonLabel(v.l); }
 function drillSrcHTML(d, i){
@@ -184,15 +184,15 @@ function updateChips(){
   $('#speedBtn').classList.toggle('on', S.speed<1);
 }
 function lessonProgress(n){
-  const ds = B.dialogues.filter(d=>d.l===n); const done = ds.filter(d=>S.done[d.id]).length;
+  const ds = n===0 ? FLOW[0] : B.dialogues.filter(d=>d.l===n); const done = ds.filter(d=>S.done[d.id]).length;
   return {done, total: ds.length, pct: Math.round(done/ds.length*100)};
 }
 function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 /* ---------------- side nav ---------------- */
 function renderSide(cur){
-  $('#side').innerHTML = `<a href="#/" class="${cur==='home'?'cur':''}">🏠 首頁</a><a href="#/review" class="${cur==='review'?'cur':''}">📝 複習清單（${Object.keys(S.review).length}）</a>` +
-    B.lessons.map(l => { const p = lessonProgress(l.n); return `<a href="#/l/${l.n}" class="${cur===l.n?'cur':''}">第${l.n}課 ${esc(l.t)}<small>${esc(l.zh)}・${p.done}/${p.total} 完成</small></a>`; }).join('');
+  $('#side').innerHTML = `<a href="#/" class="${cur==='home'?'cur':''}">🏠 首頁</a><a href="#/review" class="${cur==='review'?'cur':''}">📝 複習清單（${Object.keys(S.review).length}）</a><a href="#/p/b/0" class="${cur==='book'?'cur':''}">📚 整本課本（全部頁面）</a>` +
+    B.lessons.map(l => { const p = lessonProgress(l.n); return `<a href="#/l/${l.n}" class="${cur===l.n?'cur':''}">${l.n?`第${l.n}課 `:''}${esc(l.t)}<small>${esc(l.zh)}・${p.done}/${p.total} 完成</small></a>`; }).join('');
 }
 
 /* ---------------- views ---------------- */
@@ -203,12 +203,13 @@ function viewHome(){
   <h1>文化日本語 第1～12課 聽力練習</h1>
   <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
   <div class="row" style="margin:8px 0 14px">
-    <a class="btn" href="#/l/1" style="text-decoration:none">從第1課開始</a>
+    <a class="btn" href="#/l/0" style="text-decoration:none">從入門開始</a><a class="btn ghost" href="#/l/1" style="text-decoration:none">第1課</a>
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${Object.keys(S.review).length}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
+  <div class="small" style="margin:-6px 0 12px"><a href="#/p/b/0" style="color:inherit">📚 翻閱整本課本（全部 272 頁・含第13–18課與附錄）›</a></div>
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
-    return `<a class="card" href="#/l/${l.n}"><div class="lnum">第${l.n}課 ${UNCERTAIN[l.n]?'<span class="badge u">部分推定</span>':''}</div><div class="ltitle">${esc(l.t)}</div><div class="small mute">${esc(l.zh)}</div><div class="small mute">${esc(l.topic)}</div>
+    return `<a class="card" href="#/l/${l.n}"><div class="lnum">${lessonLabel(l.n)} ${UNCERTAIN[l.n]?'<span class="badge u">部分推定</span>':''}</div><div class="ltitle">${esc(l.t)}</div><div class="small mute">${esc(l.zh)}</div><div class="small mute">${esc(l.topic)}</div>
     <div class="bar"><i style="width:${p.pct}%"></i></div><div class="small mute" style="margin-top:4px">${p.done}/${p.total} 對話${q.length?`・測驗最佳 ${Math.max(...q)}%`:''}</div></a>`; }).join('')}</div>
   <h2>📱 加到主畫面（離線也能複習）</h2>
   <div class="card small">
@@ -227,24 +228,22 @@ function viewLesson(n){
   current = {type:'review', keys: FLOW[n].flatMap(d => d.lines.map((_,i)=>d.id+':'+i))};
   const gs = Object.entries(B.grammar).filter(([k,g])=>g.l===n);
   $('#view').innerHTML = `
-  <div class="crumb"><a href="#/">首頁</a> › 第${n}課</div>
-  <h1>第${n}課　${esc(L.t)}</h1>
+  <div class="crumb"><a href="#/">首頁</a> › ${lessonLabel(n)}</div>
+  <h1>${n?`第${n}課　`:''}${esc(L.t)}</h1>
   <div class="kana">${esc(L.r)}</div><div class="mute">${esc(L.zh)}・${esc(L.topic)}</div>
   ${UNCERTAIN[n]?`<div class="scene">⚠️ 注意：${esc(UNCERTAIN[n])}，其他文型已對照官方資料。</div>`:''}
   <div class="row" style="margin:6px 0"><span class="small mute">課本 p.${L.pages[0]}–${L.pages[1]}</span><a class="btn sm" style="text-decoration:none" href="#/p/${L.n}/0">📄 課本頁面（${L.pages[1]-L.pages[0]+1} 頁）</a></div>
   ${playerHTML(true)}
   <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
   <div class="small mute" style="margin:0 0 8px">「全部播放」會依下面的順序（課本頁序 → 實用會話）一句一句播完整課。</div>
-  ${n===1?`<h2>🌱 生活の言葉（第1課前，p.14–21）</h2><div class="dlist">${FLOW[0].map(fCard).join('')}</div>`:''}
-  <h2>📖 課本內容（依課本頁序：本文＋文型）</h2>
+  <h2>📖 課本內容（依課本頁序${n?'：本文＋文型':''}）</h2>
   <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
-  <h2>🎧 實用會話（依本課文型自編）</h2>
-  <div class="dlist">${FLOW[n].filter(d=>!d.drill&&!isText(d)).map(fCard).join('')}</div>
-  <div class="row" style="margin-top:10px"><a class="btn" style="text-decoration:none" href="#/q/L${n}">✏️ 第${n}課 聽力測驗</a></div>
+  ${n?`<h2>🎧 實用會話（依本課文型自編）</h2>
+  <div class="dlist">${FLOW[n].filter(d=>!d.drill&&!isText(d)).map(fCard).join('')}</div>`:''}
+  <div class="row" style="margin-top:10px"><a class="btn" style="text-decoration:none" href="#/q/L${n}">✏️ ${lessonLabel(n)} 聽力測驗</a></div>
   ${pagesSection(L)}
-  <details ${gs.length<=0?'':''}><summary>📚 本課文型（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>
-  ${n===1?`<details><summary>📚 生活の言葉（第1課前）</summary><div class="gl">${Object.entries(B.grammar).filter(([k,g])=>g.l===0).map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>`:''}
-  <div class="row" style="margin-top:14px">${n>1?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n-1}">‹ 第${n-1}課</a>`:''}${n<12?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n+1}">第${n+1}課 ›</a>`:''}</div>`;
+  <details ${gs.length<=0?'':''}><summary>📚 ${n?'本課文型':'入門項目'}（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>
+  <div class="row" style="margin-top:14px">${n>0?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n-1}">‹ ${lessonLabel(n-1)}</a>`:''}${n<12?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n+1}">第${n+1}課 ›</a>`:''}</div>`;
   bindPlayer();
 }
 
@@ -252,10 +251,10 @@ function gItemHTML(k, g){ return `<div class="g"><b>${esc(gLabel(k))}</b><div cl
 function viewDrill(k){
   const d = DRILL[k]; if(!d) return viewHome();
   const g = B.grammar[k], n = d.l, L = LESSON[n];
-  renderSide(n || 1); reveal = {};
+  renderSide(n); reveal = {};
   current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
   $('#view').innerHTML = `
-  <div class="crumb"><a href="#/">首頁</a> › ${L?`<a href="#/l/${n}">第${n}課 ${esc(L.t)}</a>`:`<a href="#/l/1">生活の言葉</a>`} › 同文型練習</div>
+  <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › ${n?'同文型練習':esc(g.p)}</div>
   <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
   <h1>🎧 ${esc(gLabel(k))}</h1>
   <div class="scene">💡 ${esc(g.zh)}</div>
@@ -268,10 +267,19 @@ function viewDrill(k){
   bindPlayer();
 }
 function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
-  return `<a class="card" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'生活の言葉':'文型'}${esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(g.p)}</div><div class="small mute">課本例句 ${d.lines.length} 句</div></a>`; }
+  return `<a class="card" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
 function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
+// 整本課本（使用者提供的 PDF 全部 272 頁，0 = 封面前空白頁；253 起為別冊，頁碼另計）
+const BOOKL = {n:'b', t:'整本課本', pages:[0, 271]};
+const BOOK_TOC = [{t:'封面・はじめに・このテキストについて・目次', a:0, b:7}]
+  .concat(B.lessons.map(l => ({t: l.n ? `第${l.n}課 ${l.t}` : l.t, a:l.pages[0], b:l.pages[1]})))
+  .concat([['第13課 インタビュー調査',148,157],['第14課 サラさんの日記',158,165],['第15課 どちらのほうが近いですか。',166,178],['第16課 病院',179,191],['第17課 アルバイト',192,203],['第18課 ドライブに行きませんか。',204,212],
+    ['付録：動詞・い形容詞・な形容詞一覧',213,219],['助数詞表',220,222],['文型一覧',223,229],['50音索引',230,252],['別冊 各課索引',253,271]].map(([t,a,b])=>({t,a,b})));
+const tocOf = p => BOOK_TOC.find(x => p>=x.a && p<=x.b) || BOOK_TOC[0];
+const pLabel = p => p>=254 ? `別冊 p.${p-254}` : p===253 ? '別冊 表紙' : `p.${p}`;
+const LOF = n => n==='b' ? BOOKL : LESSON[n];
 const pageSrc = p => `pages/p${String(p).padStart(3,'0')}.webp`;
 function pagesSection(L){
   const ps = pageList(L);
@@ -281,23 +289,29 @@ function pagesSection(L){
 }
 let pv = null;
 function viewPage(n, idx){
-  const L = LESSON[n]; if(!L) return viewHome();
+  const L = LOF(n); if(!L) return viewHome();
+  const BK = n==='b';
   const ps = pageList(L); idx = Math.max(0, Math.min(ps.length-1, idx|0)); const p = ps[idx];
-  renderSide(n); current = null;
+  renderSide(BK ? 'book' : n); current = null;
   pv = {n, idx, len: ps.length, zoom: (pv && pv.n===n) ? pv.zoom : 1};
-  const prevL = LESSON[n-1], nextL = LESSON[n+1];
+  const prevL = BK ? null : LESSON[n-1], nextL = BK ? null : LESSON[n+1], sec = BK ? tocOf(p) : null;
   $('#view').innerHTML = `
-  <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">第${n}課 ${esc(L.t)}</a> › 課本頁面</div>
+  <div class="crumb"><a href="#/">首頁</a> › ${BK ? '整本課本' : `<a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › 課本頁面`}</div>
+  ${BK ? `<div class="row pvnav" style="margin:4px 0 8px;gap:6px;flex-wrap:wrap"><select id="bkToc" aria-label="目次" style="max-width:100%;font-size:14px;padding:4px">${BOOK_TOC.map(x=>`<option value="${x.a}" ${x===sec?'selected':''}>${esc(x.t)}（${pLabel(x.a)}–${pLabel(x.b)}）</option>`).join('')}</select>
+    <form id="bkGo" style="display:flex;gap:4px;align-items:center"><span class="small">跳到 p.</span><input id="bkNum" type="number" inputmode="numeric" min="0" max="271" value="${p}" style="width:4.5em;font-size:14px;padding:3px"><button class="btn sm ghost">Go</button></form>
+    <button class="btn sm ghost" data-act="pgcache" data-l="b" data-a="${sec.a}" data-b="${sec.b}">⬇︎ 這一段存離線</button><span class="small mute" id="pgcInfo"></span></div>` : ''}
   <div class="pvbar">
     <a class="btn sm ghost" href="${idx>0?`#/p/${n}/${idx-1}`:(prevL?`#/p/${n-1}/${pageList(prevL).length-1}`:'#/p/'+n+'/0')}" aria-label="上一頁" style="text-decoration:none">‹ 上一頁</a>
-    <div class="pvlabel"><b>第${n}課・p.${p}</b><span class="small mute">（${idx+1} / ${ps.length}）</span></div>
+    <div class="pvlabel"><b>${BK ? `${pLabel(p)}<span class="small mute" style="font-weight:normal">・${esc(sec.t.length>14 ? sec.t.slice(0,13)+'…' : sec.t)}</span>` : `${lessonLabel(n)}・p.${p}`}</b><span class="small mute">（${idx+1} / ${ps.length}）</span></div>
     <a class="btn sm ghost" href="${idx<ps.length-1?`#/p/${n}/${idx+1}`:(nextL?`#/p/${n+1}/0`:'#/p/'+n+'/'+idx)}" aria-label="下一頁" style="text-decoration:none">下一頁 ›</a>
   </div>
   <div class="pvtools row"><div class="seg"><button data-z="1" class="${pv.zoom===1?'on':''}">符合寬度</button><button data-z="1.6" class="${pv.zoom===1.6?'on':''}">1.6×</button><button data-z="2.4" class="${pv.zoom===2.4?'on':''}">2.4×</button></div>
     <button class="btn sm ghost" id="pvFull">⛶ 全螢幕</button><a class="btn sm ghost" style="text-decoration:none" href="${pageSrc(p)}" target="_blank" rel="noopener">原圖</a></div>
-  <div class="pvwrap" id="pvwrap"><img id="pvimg" width="1200" height="1714" src="${pageSrc(p)}" alt="第${n}課 課本 p.${p}" style="width:${pv.zoom*100}%"></div>
+  <div class="pvwrap" id="pvwrap"><img id="pvimg" width="1200" height="1714" src="${pageSrc(p)}" alt="課本 ${pLabel(p)}" style="width:${pv.zoom*100}%"></div>
   <div class="small mute" style="margin-top:6px">左右滑動或按 ← → 翻頁；點兩下放大／縮小；手機也可以用兩指縮放。${idx===ps.length-1&&nextL?'下一頁會進入第'+(n+1)+'課。':''}</div>
-  <div class="pvstrip">${ps.map((q,i)=>`<a href="#/p/${n}/${i}" class="${i===idx?'cur':''}">p.${q}</a>`).join('')}</div>`;
+  <div class="pvstrip">${(BK ? ps.filter(q=>q>=sec.a&&q<=sec.b) : ps).map(q=>{ const i = ps.indexOf(q); return `<a href="#/p/${n}/${i}" class="${i===idx?'cur':''}">${BK?pLabel(q):'p.'+q}</a>`; }).join('')}</div>`;
+  if(BK){ $('#bkToc').onchange = e => { location.hash = `#/p/b/${e.target.value}`; };
+    $('#bkGo').onsubmit = e => { e.preventDefault(); const v = Math.max(0, Math.min(271, parseInt($('#bkNum').value,10)||0)); location.hash = `#/p/b/${v}`; }; }
   // preload neighbours
   [ps[idx+1], ps[idx-1]].forEach(q => { if(q){ const im = new Image(); im.src = pageSrc(q); } });
   const wrap = $('#pvwrap'), img = $('#pvimg');
@@ -317,17 +331,18 @@ function viewPage(n, idx){
   }, {passive:true});
 }
 function flip(dir){
-  if(!pv) return; const L = LESSON[pv.n]; const i = pv.idx + dir;
+  if(!pv) return; const i = pv.idx + dir;
   if(i>=0 && i<pv.len) location.hash = `#/p/${pv.n}/${i}`;
+  else if(pv.n==='b') return;
   else if(i<0 && LESSON[pv.n-1]) location.hash = `#/p/${pv.n-1}/${pageList(LESSON[pv.n-1]).length-1}`;
   else if(i>=pv.len && LESSON[pv.n+1]) location.hash = `#/p/${pv.n+1}/0`;
 }
-document.addEventListener('keydown', e => { if(!location.hash.startsWith('#/p/')) return; if(e.key==='ArrowRight') flip(1); else if(e.key==='ArrowLeft') flip(-1); });
-async function cacheLessonPages(n){
+document.addEventListener('keydown', e => { if(!location.hash.startsWith('#/p/') || /INPUT|SELECT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return; if(e.key==='ArrowRight') flip(1); else if(e.key==='ArrowLeft') flip(-1); });
+async function cacheLessonPages(n, a, b){
   if(!('caches' in window)) return toast('此瀏覽器不支援離線');
-  const ps = pageList(LESSON[n]); const c = await caches.open('nh-pages-v1'); let k=0;
+  const ps = n==='b' ? pageList({pages:[a, b]}) : pageList(LESSON[n]); const c = await caches.open('nh-pages-v1'); let k=0;
   for(const p of ps){ try{ if(!(await c.match(pageSrc(p)))) await c.add(pageSrc(p)); }catch(e){} k++; const el=$('#pgcInfo'); if(el) el.textContent=`${k}/${ps.length}`; }
-  const el=$('#pgcInfo'); if(el) el.textContent='本課頁面已存離線 ✓';
+  const el=$('#pgcInfo'); if(el) el.textContent = n==='b' ? '這一段已存離線 ✓' : '本課頁面已存離線 ✓';
 }
 let reveal = {}; // key -> level 0..2
 function lineHTML(d, i, opts={}){
@@ -335,7 +350,7 @@ function lineHTML(d, i, opts={}){
   const lv = S.listenFirst ? (reveal[key]||0) : 2;
   const inRev = !!S.review[key];
   return `<div class="line" data-key="${key}">
-    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg} ${esc(ln.tag||'')}・`:''}${opts.showId?`${d.drill?`文型${d.drill} p.${ln.pg}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
+    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg} ${esc(ln.tag||'')}・`:''}${opts.showId?`${d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
       <div class="lbtns"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><button class="ibtn" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次">🔁</button></div></div>
     ${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
     ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}
@@ -417,7 +432,7 @@ let Q = null;
 function buildQuiz(scope){
   let items = [];
   if(scope==='review') items = Object.keys(S.review).map(k=>{ const [id,i]=k.split(':'); return [DLG[id], +i]; }).filter(x=>x[0]&&x[0].lines[x[1]]);
-  else if(scope[0]==='L'){ const n = +scope.slice(1); B.dialogues.filter(d=>d.l===n).forEach(d=>d.lines.forEach((ln,i)=>items.push([d,i]))); }
+  else if(scope[0]==='L'){ const n = +scope.slice(1); (n===0 ? FLOW[0] : B.dialogues.filter(d=>d.l===n)).forEach(d=>d.lines.forEach((ln,i)=>items.push([d,i]))); }
   else { const d = DLG[scope]; if(d) d.lines.forEach((ln,i)=>items.push([d,i])); }
   items = items.filter(([d,i]) => d.lines[i].ja.length >= 4);
   items = shuffle(items).slice(0, scope[0]==='L' ? 10 : 8);
@@ -436,7 +451,7 @@ function viewQuiz(scope){
   const qs = buildQuiz(scope);
   let back = '#/', backName = '首頁', title = '聽力測驗';
   if(scope==='review'){ back='#/review'; backName='複習清單'; title='複習測驗'; renderSide('review'); }
-  else if(scope[0]==='L'){ const n=+scope.slice(1); back=`#/l/${n}`; backName=`第${n}課`; title=`第${n}課 聽力測驗`; renderSide(n); }
+  else if(scope[0]==='L'){ const n=+scope.slice(1); back=`#/l/${n}`; backName=lessonLabel(n); title=`${lessonLabel(n)} 聽力測驗`; renderSide(n); }
   else if(DLG[scope] && DLG[scope].drill){ const k=DLG[scope].drill; back=`#/g/${k}`; backName='同文型練習'; title=`${gLabel(k)} 小測驗`; renderSide(DLG[scope].l||1); }
   else if(DLG[scope]){ back=`#/d/${scope}`; backName=`對話 ${scope}`; title=`${DLG[scope].src?`第${DLG[scope].l}課${DLG[scope].src.label}`:'對話 '+scope}「${DLG[scope].title}」測驗`; renderSide(DLG[scope].l); }
   if(!qs.length){ $('#view').innerHTML = `<div class="crumb"><a href="${back}">‹ ${backName}</a></div><div class="card">沒有可以出題的句子。</div>`; return; }
@@ -512,7 +527,7 @@ document.addEventListener('click', e => {
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = Math.min(2, +el.dataset.lv + 1); el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
-  else if(act==='pgcache'){ cacheLessonPages(+b.dataset.l); }
+  else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
 $('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
@@ -561,7 +576,7 @@ function route(){
   else if(a==='q') viewQuiz(b);
   else if(a==='g') viewDrill(b);
   else if(a==='review') viewReview();
-  else if(a==='p') viewPage(+b, +(h.split('/')[2]||0));
+  else if(a==='p') viewPage(b==='b' ? 'b' : +b, +(h.split('/')[2]||0));
   else viewHome();
   updateChips(); window.scrollTo(0,0);
 }
