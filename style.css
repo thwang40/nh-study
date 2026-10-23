@@ -127,3 +127,14 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .dline.playing{box-shadow:0 0 0 2px var(--red);background:#be1e2d0d}
 .glinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:10px}
 .glink{display:flex;flex-direction:column;gap:2px;text-decoration:none;padding:10px 12px}
+/* 📖 課本頁面 button in item headers + overlay viewer */
+.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:6px 12px;flex-wrap:wrap}
+.hrow h1{flex:1 1 300px;margin-right:auto}
+.bookbtn{flex:none;margin-top:4px;white-space:nowrap}
+.pm{position:fixed;inset:0;z-index:1000;background:#1d1813;display:flex;flex-direction:column}
+.pm-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:#2a221c;color:#fff}
+.pm-bar .t{font-weight:600;margin-right:auto;font-size:14px}
+.pm-bar .btn{background:#fff;color:#222;border-color:#fff}
+.pm-bar .seg{background:#fff;border-radius:999px}
+.pm-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom}
+.pm-wrap img{display:block;max-width:none;height:auto;margin:0 auto;background:#fff}

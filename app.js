@@ -256,7 +256,7 @@ function viewDrill(k){
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › ${n?'同文型練習':esc(g.p)}</div>
   <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
-  <h1>🎧 ${esc(gLabel(k))}</h1>
+  <div class="hrow"><h1>🎧 ${esc(gLabel(k))}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
   <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
@@ -344,6 +344,56 @@ async function cacheLessonPages(n, a, b){
   for(const p of ps){ try{ if(!(await c.match(pageSrc(p)))) await c.add(pageSrc(p)); }catch(e){} k++; const el=$('#pgcInfo'); if(el) el.textContent=`${k}/${ps.length}`; }
   const el=$('#pgcInfo'); if(el) el.textContent = n==='b' ? '這一段已存離線 ✓' : '本課頁面已存離線 ✓';
 }
+// ---- 📖 課本 p.xx：各項目對應的課本頁面（覆蓋視窗） ----
+const SPAN = {'5-T2':[64,65], '6-T1':[70,71], '12-T1':[138,139]}; // 本文跨兩頁
+function itemPages(d){
+  if(d.drill) return [...new Set(d.lines.map(l=>l.pg).filter(Boolean))].sort((a,b)=>a-b);
+  if(d.src) return SPAN[d.id] || [d.src.page];
+  return [...new Set(d.lines.flatMap(l=>l.g||[]).map(k=>B.grammar[k] && B.grammar[k].pg).filter(Boolean))].sort((a,b)=>a-b); // 實用會話：所依據的文型頁
+}
+function pagesLabel(ps){ const run = ps.every((p,i)=>!i || p===ps[i-1]+1); return 'p.' + (ps.length===1 ? ps[0] : run ? `${ps[0]}–${ps[ps.length-1]}` : ps.join('・')); }
+function bookBtnHTML(d){ const ps = itemPages(d); if(!ps.length) return '';
+  const lab = ps.length>3 && !ps.every((p,i)=>!i || p===ps[i-1]+1) ? `p.${ps[0]} 等 ${ps.length} 頁` : pagesLabel(ps);
+  return `<button class="btn sm ghost bookbtn" data-act="bookpg" data-d="${d.id}" title="${d.src||d.drill?'打開這一項的課本頁面':'打開這段會話所依據的課本文型頁面'}">📖 課本 ${lab}</button>`; }
+let PM = null;
+function openPageModal(ps, title){
+  closePageModal(true);
+  const el = document.createElement('div'); el.className = 'pm'; el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-label', title);
+  el.innerHTML = `<div class="pm-bar"><span class="t">${esc(title)}</span>
+    <button class="btn sm" data-pm="prev" aria-label="上一頁">‹</button><span class="small" id="pmLab"></span><button class="btn sm" data-pm="next" aria-label="下一頁">›</button>
+    <div class="seg"><button data-pz="1">符合寬度</button><button data-pz="1.6">1.6×</button><button data-pz="2.4">2.4×</button></div>
+    <button class="btn sm" data-pm="close" aria-label="關閉">✕ 關閉</button></div>
+    <div class="pm-wrap" id="pmWrap"><img id="pmImg" width="1200" height="1714" alt=""></div>`;
+  document.body.appendChild(el); document.body.style.overflow = 'hidden';
+  PM = {el, ps, i:0, zoom:1};
+  const img = el.querySelector('#pmImg'), wrap = el.querySelector('#pmWrap');
+  const show = () => { const p = PM.ps[PM.i]; img.src = pageSrc(p); img.alt = `課本 p.${p}`; img.style.width = (PM.zoom*100)+'%';
+    el.querySelector('#pmLab').textContent = `p.${p}` + (PM.ps.length>1 ? `（${PM.i+1}/${PM.ps.length}）` : '');
+    el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => b.style.visibility = PM.ps.length>1 ? 'visible' : 'hidden');
+    el.querySelectorAll('[data-pz]').forEach(b => b.classList.toggle('on', +b.dataset.pz===PM.zoom)); wrap.scrollTop = 0;
+    const nx = PM.ps[PM.i+1]; if(nx){ const im = new Image(); im.src = pageSrc(nx); } };
+  PM.go = dir => { const j = PM.i + dir; if(j>=0 && j<PM.ps.length){ PM.i = j; show(); } };
+  PM.zoomTo = z => { PM.zoom = z; show(); };
+  el.addEventListener('click', e => { const b = e.target.closest('[data-pm],[data-pz]'); if(!b) return;
+    if(b.dataset.pz) PM.zoomTo(+b.dataset.pz); else if(b.dataset.pm==='close') closePageModal(); else PM.go(b.dataset.pm==='next' ? 1 : -1); });
+  let last = 0; img.addEventListener('click', () => { const t = Date.now(); if(t-last < 350) PM.zoomTo(PM.zoom>1 ? 1 : 2.4); last = t; });
+  let sx=0, sy=0, multi=false;
+  wrap.addEventListener('touchstart', e => { multi = e.touches.length>1; sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive:true});
+  wrap.addEventListener('touchend', e => { if(multi || PM.zoom>1 || (window.visualViewport && visualViewport.scale>1.05)) return;
+    const t = e.changedTouches[0], dx = t.clientX-sx, dy = t.clientY-sy; if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) PM.go(dx<0 ? 1 : -1); }, {passive:true});
+  show();
+  try{ history.pushState({pm:1}, ''); PM.pushed = true; }catch(e){}   // 手機「返回」鍵／手勢 = 關閉
+  el.querySelector('[data-pm="close"]').focus();
+}
+function closePageModal(silent){
+  if(!PM) return; const pm = PM; PM = null;
+  pm.el.remove(); document.body.style.overflow = '';
+  if(!silent && pm.pushed && history.state && history.state.pm) history.back();
+}
+window.addEventListener('popstate', () => { if(PM){ PM.pushed = false; closePageModal(true); } });
+document.addEventListener('keydown', e => { if(!PM) return;
+  if(e.key==='Escape'){ e.preventDefault(); closePageModal(); } else if(e.key==='ArrowRight') PM.go(1); else if(e.key==='ArrowLeft') PM.go(-1); }, true);
+
 let reveal = {}; // key -> level 0..2
 function lineHTML(d, i, opts={}){
   const ln = d.lines[i]; const key = d.id+':'+i; const sp = d.sp[ln.s];
@@ -378,7 +428,7 @@ function viewDialogue(id){
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${d.l}">第${d.l}課 ${esc(L.t)}</a> › ${d.src?esc(d.src.label):'對話 '+d.id}</div>
   <div class="small"><span class="badge ${d.src?'txt':''}">${esc(srcTag(d))}</span></div>
-  <h1>${esc(d.title)}</h1>
+  <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
   <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
@@ -527,6 +577,7 @@ document.addEventListener('click', e => {
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = Math.min(2, +el.dataset.lv + 1); el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
+  else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openPageModal(itemPages(d), d.drill ? gLabel(d.drill).replace(/ p\.[\d・–]+$/,'') : d.src ? `第${d.l}課 ${d.src.label}` : `實用會話 ${d.id}（依據的文型頁）`); }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
