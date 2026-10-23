@@ -142,7 +142,7 @@ function drillSrcHTML(d, i){
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${esc(gLabel(k))}</div>`;
   h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${esc(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${lineNo(d,i).pre?`・${esc(lineNo(d,i).pre)}`:''}・${esc(lineNo(d,i).lab)}</div>`;
   h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div></div>`;
-  if(ln.x && ln.x.length) h += `<div style="margin-top:6px"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
+  if(ln.x && ln.x.length) h += `<div class="srch"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
   return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">🎧 這個文型的全部練習 ›</a></div></div>`;
 }
 function drillLineHTML(d, i){
@@ -172,15 +172,15 @@ function srcHTML(d, i){
   h += d.src ? `<div style="margin-top:4px"><span class="tag txt">課本原文</span> 第${d.l}課・${esc(d.src.label)}「${esc(d.title)}」<b>p.${d.src.page}</b>・${lineNo(d,i).lab}</div>`
              : `<div style="margin-top:4px"><span class="tag">實用會話</span> 依第${d.l}課（及之前）文型自編・對話 ${esc(d.id)} ${lineNo(d,i).lab}</div>`;
   if(ln.g.length){
-    h += `<div style="margin-top:6px"><b>文型</b></div>`;
+    h += `<div class="srch"><b>文型</b></div>`;
     ln.g.forEach(k => { const g = B.grammar[k]; if(!g) return;
-      h += `<div style="margin:4px 0"><span class="tag">${esc(gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
+      h += `<div class="gent"><span class="tag">${esc(gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
   }
   if(ln.v.length){
-    h += `<div style="margin-top:6px"><b>單字</b></div><div class="vocab">` + ln.v.map(w => { const v = B.vocab[w]; if(!v) return '';
+    h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.v.map(w => { const v = B.vocab[w]; if(!v) return '';
       return `<span>${esc(w)}${v.r!==w?`（${esc(v.r)}）`:''}＝${esc(v.zh)} <em>${esc(vLabel(w))}</em></span>`; }).join('') + `</div>`;
   }
-  if(ln.note) h += `<div class="small" style="margin-top:6px">💡 ${esc(ln.note)}</div>`;
+  if(ln.note) h += `<div class="small srtip">💡 ${esc(ln.note)}</div>`;
   h += drillsHTML(ln.g);
   return h + `</div>`;
 }

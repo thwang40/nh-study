@@ -311,3 +311,11 @@ body.has-pside .igrp{--igw:122px}
   .srcbox.sx{margin:0 2px 8px 6px}
   .igrows > .srcbox.sx.wide{margin-right:2px}
 }
+
+/* 出處 panel spacing: each 文型 entry is its own block */
+.src .srch{margin-top:14px}
+.src .gent{margin:4px 0 0}
+.src .gent + .gent{margin-top:14px}
+.src .gent .small{margin-top:2px;line-height:1.55}
+.src .srtip{margin-top:12px}
+.src .vocab{margin-top:4px}
