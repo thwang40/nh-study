@@ -6,7 +6,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
 function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
-// 聽力優先 is always the default: the 聽力優先／顯示全文 toggle only applies to the page you are on and is never stored.
+// 聽力優先 is always the default. 顯示全文 is now a per-block toggle (blkBtn) that only lasts for the page you are on and is never stored.
 // (Older versions saved listenFirst:false in localStorage, which made every page open with the text shown.)
 S.listenFirst = true;
 function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); }
@@ -181,8 +181,8 @@ function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速�
 function drillsHTML(keys, skip){
   keys = keys.filter(k => DRILL[k] && k !== skip); if(!keys.length) return '';
   return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">課本文型例句（標頁碼），先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
-    return `<details class="drill" ${n===0?'open':''}><summary>${esc(gLabel(k))}（${d.lines.length} 句）</summary>
-    <div class="row drillbar"><button class="btn sm" data-act="dall" data-d="${d.id}">▶ 全部播放</button>${speedSegHTML()}<a class="btn sm ghost" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗</a><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">全頁 ›</a></div>
+    return `<details class="drill" data-blk ${n===0?'open':''}><summary>${esc(gLabel(k))}（${d.lines.length} 句）</summary>
+    <div class="row drillbar"><button class="btn sm" data-act="dall" data-d="${d.id}">▶ 全部播放</button>${speedSegHTML()}<a class="btn sm ghost" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗</a><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">全頁 ›</a>${blkBtn(false)}</div>
     <div class="dlines">${d.lines.map((_, i) => drillLineHTML(d, i)).join('')}</div></details>`; }).join('') + `</div>`;
 }
 function situSrcHTML(d, i){
@@ -341,7 +341,7 @@ function drillParse(d){
 }
 function drillRowHTML(d, i, P){
   const ln = d.lines[i], key = d.id+':'+i, r = (P || drillParse(d))[i];
-  const lv = S.listenFirst ? (reveal[key]||0) : 2;
+  const lv = (reveal[key]||0);
   const who = r.who ? `<span class="swho" style="color:${r.color}">${esc(r.who)}：</span>` : '';
   const body = lv>=1 ? `<div class="ja">${who}${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}${r.note?`<div class="snote">${esc(r.note)}</div>`:''}`
                      : (r.who ? `<span class="swho inl" style="color:${r.color}">${esc(r.who)}：</span>` : '') + maskHTML(ln.ja);
@@ -362,7 +362,7 @@ function viewDrill(k){
   <div class="hrow"><h1>🎧 ${esc(gLabel(k))}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
-  <div class="script dscript" id="lines"><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span></div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
+  <div class="script dscript" id="lines" data-blk><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span>${blkBtn(false)}</div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗：聽到的是哪一句？／意思是？</a>
@@ -558,7 +558,7 @@ document.addEventListener('keydown', e => { if(!PM || /INPUT|SELECT|TEXTAREA/.te
 let reveal = {}; // key -> level 0..2
 function lineHTML(d, i, opts={}){
   const ln = d.lines[i]; const key = d.id+':'+i; const sp = d.sp[ln.s];
-  const lv = S.listenFirst ? (reveal[key]||0) : 2;
+  const lv = (reveal[key]||0);
   const inRev = !!S.review[key];
   return `<div class="line${S.unf[key]?' unf':''}" data-key="${key}">
     <div class="lhead">${ufHTML(key, ln.scene)}<span class="spk ${ln.cls||ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg}${lineNo(d,i).pre?' '+esc(lineNo(d,i).pre):''}・`:''}${opts.showId?`${d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.situ?`場合使用（課外）第${d.l}課${d.src.label}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}${esc(lineNo(d,i).lab)}</span>
@@ -577,10 +577,20 @@ function playerHTML(noMode){
   return `<div class="player"><div class="row">
     <button class="btn" id="playAllBtn">▶ 全部播放</button>
     <div class="seg" role="group" aria-label="速度"><button data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>
-    ${noMode?'':`<div class="seg" role="group" aria-label="模式"><button data-mode="listen" class="${S.listenFirst?'on':''}">聽力優先</button><button data-mode="show" class="${!S.listenFirst?'on':''}">顯示全文</button></div>`}
   </div></div>`;
 }
 let current = null; // {type, d, idxs}
+// 每個區塊各自的「顯示全文／隱藏」（不儲存；換頁就回到聽力優先）
+function blkBtn(on){ return `<button class="bshow${on?' on':''}" data-act="bshow" aria-pressed="${on}" title="${on?'回到聽力優先（隱藏這一段）':'這一段顯示全文（日文＋假名＋中文）'}">${on?'🙈 隱藏':'👁 顯示全文'}</button>`; }
+function blockShow(b){
+  const box = b.closest('[data-blk]'); if(!box) return; const on = !b.classList.contains('on');
+  if(box.tagName==='DETAILS' && on) box.open = true;
+  const mine = el => el.parentElement.closest('[data-blk]') === box;
+  [...box.querySelectorAll('.line[data-key]')].filter(mine).forEach(el => { const k = el.dataset.key, [id, i] = k.split(':');
+    reveal[k] = on ? 2 : 0; if(!on) closeSrc(k); rerenderLine(DLG[id], +i, {}); });
+  [...box.querySelectorAll('.dline')].filter(mine).forEach(el => { const lv = on ? 2 : 0; el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); });
+  b.outerHTML = blkBtn(on);
+}
 // ---- 本文／實用會話：仿課本的對話框排版（一個輪次一行：說話者｜文字）----
 const SPK_COLORS = ['#1b5fa8','#be1e2d','#2f7d32','#8a4fbf','#b8620b','#0f7c86'];
 function isNarr(d){ const ss = new Set(d.lines.filter(l=>!l.scene).map(l=>l.s)); return ss.size===1; }
@@ -590,7 +600,7 @@ function maskHTML(t){ const n = Math.max(3, [...t.replace(/[（）]/g,'')].lengt
   return h + `<span class="sr">（點一下顯示日文）</span>`; }
 function rowHTML(d, i){
   const ln = d.lines[i], key = d.id+':'+i, sp = d.sp[ln.s];
-  const lv = S.listenFirst ? (reveal[key]||0) : 2, narr = isNarr(d) && !ln.scene;
+  const lv = (reveal[key]||0), narr = isNarr(d) && !ln.scene;
   const name = ln.scene ? '' : narr ? '' : `<div class="sname" style="color:${spkColor(d, ln.s)}">${esc(sp.name)}<span class="colon">：</span></div>`;
   const body = (ln.scene ? '<span class="stag">場景</span>' : '') + (lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja));
   return `<div class="line srow${ln.scene?' sscene':''}${narr?' snarr':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key, ln.scene)}${name}
@@ -637,7 +647,7 @@ function viewDialogue(id){
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
-  <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines">${illHTML(d)}${scriptRowsHTML(d)}</div>
+  <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines" data-blk><div class="blkbar">${blkBtn(false)}</div>${illHTML(d)}${scriptRowsHTML(d)}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   ${splitHTML(d)}
   ${situHTML(d)}
@@ -649,8 +659,8 @@ function viewDialogue(id){
 }
 function splitHTML(d){ const v = SPLITD[d.id]; if(!v) return '';
   const n = v.lines.length;
-  return `<section class="splitsec" aria-label="逐句聽力練習">
-    <div class="splithead"><h2>🎧 逐句聽力練習</h2><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button><span class="small mute">${n} 句</span></div>
+  return `<section class="splitsec" aria-label="逐句聽力練習" data-blk>
+    <div class="splithead"><h2>🎧 逐句聽力練習</h2><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button><span class="small mute">${n} 句</span>${blkBtn(false)}</div>
     <div class="small mute">上面有人一次說超過三句，這裡拆成一句一句聽。點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。</div>
     ${v.groups.map(g => { const ln = d.lines[g.ti];
       return `<div class="splitgrp"><div class="splitsrc"><span class="spk ${ln.s}">${esc(d.sp[ln.s].name)}</span> ${esc(lineNo(d, g.ti).lab)}（共 ${g.idx.length} 句）・課本 p.${d.src ? d.src.page : ''}</div>
@@ -660,7 +670,7 @@ function situHTML(d){ const v = SITUD[d.id]; if(!v) return '';
   return `<section class="situsec" aria-label="場合使用">
     <div class="splithead"><h2>💬 場合使用</h2><span class="xtra-badge">課外情境例句（非課本原文）</span><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button></div>
     <div class="small mute">用這段本文的句型，換到其他生活場合（N5–N4 程度）。不是課本內容，課本原文請看上面。</div>
-    ${v.groups.map(g => `<details class="script situgrp"${g.si===0?' open':''}><summary class="situhead"><span class="sittag">🎬 情境${g.si+1}</span>${esc(g.t)}</summary>${g.idx.map(k => rowHTML(v, k)).join('')}</details>`).join('')}
+    ${v.groups.map(g => `<details class="script situgrp" data-blk${g.si===0?' open':''}><summary class="situhead"><span class="sittag">🎬 情境${g.si+1}</span><span class="sittl">${esc(g.t)}</span>${blkBtn(false)}</summary>${g.idx.map(k => rowHTML(v, k)).join('')}</details>`).join('')}
   </section>`; }
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
@@ -693,7 +703,6 @@ function bindPlayer(){
     if(finished && c.type==='dlg'){ S.done[c.d.id] = true; save(); toast('這段聽完了 👍 試試看測驗吧'); }
   };
   document.querySelectorAll('.player [data-sp]').forEach(b => b.onclick = () => { S.speed = +b.dataset.sp; save(); document.querySelectorAll('.player [data-sp]').forEach(x=>x.classList.toggle('on', x===b)); });
-  document.querySelectorAll('.player [data-mode]').forEach(b => b.onclick = () => { S.listenFirst = b.dataset.mode==='listen'; const y = scrollY; route(); window.scrollTo(0, y); });
 }
 
 /* review */
@@ -813,6 +822,7 @@ document.addEventListener('click', e => {
     openSrc(d, i);
     toast('已加入複習清單');
   }
+  else if(act==='bshow'){ e.preventDefault(); blockShow(b); }
   else if(act==='srcclose'){ closeSrc(b.dataset.k, b.classList.contains('bot')); }
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = (+el.dataset.lv + 1) % 3; el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }

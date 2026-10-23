@@ -373,3 +373,14 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .situgrp:not([open]) > .situhead::after{transform:rotate(-90deg)}
 .sittag{display:inline-block;font-size:11px;font-weight:600;color:#3d6a99;border:1px solid #b9d0ea;border-radius:999px;padding:0 8px;background:#fff}
 .spk.C{background:#eaf6ec;color:#2f7d32}
+
+/* 每個區塊自己的「👁 顯示全文／🙈 隱藏」 */
+.bshow{font:inherit;font-size:12px;font-weight:500;line-height:1.2;padding:3px 10px;border-radius:999px;border:1px solid #d9c48e;background:#fffdf3;color:#6b5a3a;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.bshow:hover{border-color:#b89a52}
+.bshow.on{background:#6b5a3a;color:#fff;border-color:#6b5a3a}
+.blkbar{display:flex;justify-content:flex-end;margin:-17px 22px 4px 0;position:relative;z-index:2}
+.dscript .dtitle .bshow,.splithead .bshow,.drillbar .bshow{margin-left:auto}
+.situgrp > .situhead .sittl{flex:1 1 auto;min-width:0}
+.situgrp > .situhead::after{margin-left:2px}
+.situgrp .bshow{border-color:#b9d0ea;background:#fff;color:#33557a}
+.situgrp .bshow.on{background:#3d6a99;border-color:#3d6a99;color:#fff}
