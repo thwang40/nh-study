@@ -138,3 +138,15 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .pm-bar .seg{background:#fff;border-radius:999px}
 .pm-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom}
 .pm-wrap img{display:block;max-width:none;height:auto;margin:0 auto;background:#fff}
+/* 寬螢幕：課本頁側邊視窗（內容右側，跟著畫面捲動固定） */
+@media (min-width:1100px){
+  body.has-pside .layout{max-width:1760px;grid-template-columns:260px minmax(0,1fr) clamp(360px,34vw,600px)}
+  .pside{inset:auto;position:sticky;top:52px;align-self:start;z-index:5;height:calc(100vh - 52px);background:#f3ece4;border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .pside .pm-bar{padding-top:8px}
+  .pside .pm-bar .t{flex-basis:100%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pside .pm-bar [data-pm="close"]{position:absolute;right:8px;top:6px;min-height:30px;padding:2px 10px}
+  .pside .pm-bar{position:relative;padding-right:52px}
+  .pside .pm-wrap{padding:8px}
+  .pside .pm-wrap img{box-shadow:0 1px 4px rgba(0,0,0,.15)}
+}
+.bookbtn.on{background:#fde9eb;color:var(--red);border-color:var(--red)}

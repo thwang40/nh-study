@@ -71,7 +71,7 @@ function setPlaying(key){
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
-  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・第${+i+1}句` : ''; } // no Japanese text here: listening first
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -129,7 +129,7 @@ function vLabel(w){ const v = B.vocab[w]; if(!v) return ''; return v.l==='補' ?
 function drillSrcHTML(d, i){
   const ln = d.lines[i], k = d.drill, g = B.grammar[k];
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${esc(gLabel(k))}</div>`;
-  h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${esc(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${ln.tag?`・${esc(ln.tag)}`:''}・第${i+1}句</div>`;
+  h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${esc(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${lineNo(d,i).pre?`・${esc(lineNo(d,i).pre)}`:''}・${esc(lineNo(d,i).lab)}</div>`;
   h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div></div>`;
   if(ln.x && ln.x.length) h += `<div style="margin-top:6px"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
   return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">🎧 這個文型的全部練習 ›</a></div></div>`;
@@ -355,25 +355,47 @@ function pagesLabel(ps){ const run = ps.every((p,i)=>!i || p===ps[i-1]+1); retur
 function bookBtnHTML(d){ const ps = itemPages(d); if(!ps.length) return '';
   const lab = ps.length>3 && !ps.every((p,i)=>!i || p===ps[i-1]+1) ? `p.${ps[0]} 等 ${ps.length} 頁` : pagesLabel(ps);
   return `<button class="btn sm ghost bookbtn" data-act="bookpg" data-d="${d.id}" title="${d.src||d.drill?'打開這一項的課本頁面':'打開這段會話所依據的課本文型頁面'}">📖 課本 ${lab}</button>`; }
-let PM = null;
-function openPageModal(ps, title){
+// 句子編號：文型／同文型頁依課本編號——文型標題句、1)→第1句、2)→第2句…；練習的例句標「練習x 例」，※ 為參考
+function drillNo(ln){
+  const t = (ln.tag||'').trim(); let m;
+  if((m = t.match(/^文型\s*(.*)$/))){ const r = m[1].replace(/^（(.*)）$/,'$1').trim(); return {pre:'文型', lab:'文型標題句'+(r?` ${r}`:'')}; }
+  if((m = t.match(/^(\d+)\)\s*(.*)$/))) return {pre:'', lab:`第${m[1]}句`+(m[2]?` ${m[2]}`:'')};
+  if((m = t.match(/^練習(\S+)\s*(.*)$/))) return {pre:'', lab:`練習${m[1]}${m[2]?' '+m[2]:''}`};
+  if(t[0]==='※') return {pre:'', lab:'※參考'+(t.slice(1).trim()?' '+t.slice(1).trim():'')};
+  return null;
+}
+function lineNo(d, i){ const ln = d.lines[i]; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; } return {pre:'', lab:`第${i+1}句`}; }
+let PM = null;   // 目前開著的課本頁視窗：{el, mode:'side'|'modal', id, ps, i, zoom, go, zoomTo}
+const SIDE_MIN = 1100; // 寬螢幕：在內容右側開側邊視窗；較窄（手機）用全螢幕覆蓋
+function bookTitle(d){ return d.drill ? gLabel(d.drill).replace(/ p\.[\d・–]+$/,'') : d.src ? `第${d.l}課 ${d.src.label}` : `實用會話 ${d.id}（依據的文型頁）`; }
+function openBook(d){
+  if(PM && PM.mode==='side' && PM.id===d.id){ closePageModal(); return; }   // 再按一次＝收起側邊視窗
+  openPageModal(itemPages(d), bookTitle(d), d.id, innerWidth >= SIDE_MIN ? 'side' : 'modal');
+}
+function openPageModal(ps, title, id, mode){
+  const keepZoom = PM && PM.mode==='side' && mode==='side' ? PM.zoom : 1;
   closePageModal(true);
-  const el = document.createElement('div'); el.className = 'pm'; el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-label', title);
-  el.innerHTML = `<div class="pm-bar"><span class="t">${esc(title)}</span>
+  const side = mode==='side';
+  const el = document.createElement(side ? 'aside' : 'div'); el.className = side ? 'pm pside' : 'pm';
+  if(side) el.setAttribute('aria-label', '課本頁面：'+title); else { el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-label', title); }
+  el.innerHTML = `<div class="pm-bar"><span class="t">📖 ${esc(title)}</span>
     <button class="btn sm" data-pm="prev" aria-label="上一頁">‹</button><span class="small" id="pmLab"></span><button class="btn sm" data-pm="next" aria-label="下一頁">›</button>
     <div class="seg"><button data-pz="1">符合寬度</button><button data-pz="1.6">1.6×</button><button data-pz="2.4">2.4×</button></div>
-    <button class="btn sm" data-pm="close" aria-label="關閉">✕ 關閉</button></div>
+    <button class="btn sm" data-pm="close" aria-label="關閉">✕${side?'':' 關閉'}</button></div>
     <div class="pm-wrap" id="pmWrap"><img id="pmImg" width="1200" height="1714" alt=""></div>`;
-  document.body.appendChild(el); document.body.style.overflow = 'hidden';
-  PM = {el, ps, i:0, zoom:1};
+  if(side){ document.querySelector('.layout').appendChild(el); document.body.classList.add('has-pside'); }
+  else { document.body.appendChild(el); document.body.style.overflow = 'hidden'; }
+  PM = {el, mode, id, ps, i:0, zoom:keepZoom};
   const img = el.querySelector('#pmImg'), wrap = el.querySelector('#pmWrap');
   const show = () => { const p = PM.ps[PM.i]; img.src = pageSrc(p); img.alt = `課本 p.${p}`; img.style.width = (PM.zoom*100)+'%';
     el.querySelector('#pmLab').textContent = `p.${p}` + (PM.ps.length>1 ? `（${PM.i+1}/${PM.ps.length}）` : '');
     el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => b.style.visibility = PM.ps.length>1 ? 'visible' : 'hidden');
     el.querySelectorAll('[data-pz]').forEach(b => b.classList.toggle('on', +b.dataset.pz===PM.zoom)); wrap.scrollTop = 0;
+    document.querySelectorAll('.bookbtn').forEach(b => b.classList.toggle('on', side && b.dataset.d===PM.id));
     const nx = PM.ps[PM.i+1]; if(nx){ const im = new Image(); im.src = pageSrc(nx); } };
   PM.go = dir => { const j = PM.i + dir; if(j>=0 && j<PM.ps.length){ PM.i = j; show(); } };
   PM.zoomTo = z => { PM.zoom = z; show(); };
+  PM.show = show;
   el.addEventListener('click', e => { const b = e.target.closest('[data-pm],[data-pz]'); if(!b) return;
     if(b.dataset.pz) PM.zoomTo(+b.dataset.pz); else if(b.dataset.pm==='close') closePageModal(); else PM.go(b.dataset.pm==='next' ? 1 : -1); });
   let last = 0; img.addEventListener('click', () => { const t = Date.now(); if(t-last < 350) PM.zoomTo(PM.zoom>1 ? 1 : 2.4); last = t; });
@@ -382,16 +404,26 @@ function openPageModal(ps, title){
   wrap.addEventListener('touchend', e => { if(multi || PM.zoom>1 || (window.visualViewport && visualViewport.scale>1.05)) return;
     const t = e.changedTouches[0], dx = t.clientX-sx, dy = t.clientY-sy; if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) PM.go(dx<0 ? 1 : -1); }, {passive:true});
   show();
-  try{ history.pushState({pm:1}, ''); PM.pushed = true; }catch(e){}   // 手機「返回」鍵／手勢 = 關閉
-  el.querySelector('[data-pm="close"]').focus();
+  if(!side){ try{ history.pushState({pm:1}, ''); PM.pushed = true; }catch(e){} el.querySelector('[data-pm="close"]').focus(); }   // 手機「返回」鍵／手勢 = 關閉
 }
 function closePageModal(silent){
   if(!PM) return; const pm = PM; PM = null;
-  pm.el.remove(); document.body.style.overflow = '';
+  pm.el.remove();
+  if(pm.mode==='side'){ document.body.classList.remove('has-pside'); document.querySelectorAll('.bookbtn.on').forEach(b => b.classList.remove('on')); }
+  else document.body.style.overflow = '';
   if(!silent && pm.pushed && history.state && history.state.pm) history.back();
 }
-window.addEventListener('popstate', () => { if(PM){ PM.pushed = false; closePageModal(true); } });
-document.addEventListener('keydown', e => { if(!PM) return;
+// 換到別的項目：側邊視窗跟著換成新項目的課本頁；沒有課本頁的畫面（首頁、課次總覽…）就收起
+function syncBookPanel(){
+  if(!PM || PM.mode!=='side') return;
+  const m = location.hash.match(/^#\/(d|g)\/([^/?]+)/), d = m && (m[1]==='g' ? DLG['g'+decodeURIComponent(m[2])] : DLG[decodeURIComponent(m[2])]);
+  const ps = d ? itemPages(d) : [];
+  if(!ps.length || innerWidth < SIDE_MIN){ closePageModal(true); return; }
+  if(d.id !== PM.id) openPageModal(ps, bookTitle(d), d.id, 'side'); else PM.show();
+}
+addEventListener('resize', () => { if(PM && PM.mode==='side' && innerWidth < SIDE_MIN) closePageModal(true); });
+window.addEventListener('popstate', () => { if(PM && PM.mode==='modal'){ PM.pushed = false; closePageModal(true); } });
+document.addEventListener('keydown', e => { if(!PM || /INPUT|SELECT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
   if(e.key==='Escape'){ e.preventDefault(); closePageModal(); } else if(e.key==='ArrowRight') PM.go(1); else if(e.key==='ArrowLeft') PM.go(-1); }, true);
 
 let reveal = {}; // key -> level 0..2
@@ -400,7 +432,7 @@ function lineHTML(d, i, opts={}){
   const lv = S.listenFirst ? (reveal[key]||0) : 2;
   const inRev = !!S.review[key];
   return `<div class="line" data-key="${key}">
-    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg} ${esc(ln.tag||'')}・`:''}${opts.showId?`${d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
+    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg}${lineNo(d,i).pre?' '+esc(lineNo(d,i).pre):''}・`:''}${opts.showId?`${d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}${esc(lineNo(d,i).lab)}</span>
       <div class="lbtns"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><button class="ibtn" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次">🔁</button></div></div>
     ${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
     ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}
@@ -577,7 +609,7 @@ document.addEventListener('click', e => {
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = Math.min(2, +el.dataset.lv + 1); el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
-  else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openPageModal(itemPages(d), d.drill ? gLabel(d.drill).replace(/ p\.[\d・–]+$/,'') : d.src ? `第${d.l}課 ${d.src.label}` : `實用會話 ${d.id}（依據的文型頁）`); }
+  else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
@@ -631,7 +663,7 @@ function route(){
   else viewHome();
   updateChips(); window.scrollTo(0,0);
 }
-window.addEventListener('hashchange', () => { S.listenFirst = true; reveal = {}; route(); });
+window.addEventListener('hashchange', () => { S.listenFirst = true; reveal = {}; route(); syncBookPanel(); });
 /* ---------------- page-view counter (footer) ----------------
    Abacus (https://abacus.jasoncameron.dev): free, no signup, CORS *. /hit creates the key on first use and returns {value}.
    Counted once per page load (not per hash route). Daily key uses the Asia/Taipei date. Offline or any error: show nothing. */
