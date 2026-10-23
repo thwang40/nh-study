@@ -483,11 +483,9 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .hero h1 + .sub{font-size:17px;font-weight:700;color:var(--pri);margin:0 0 4px;display:flex;align-items:center;gap:10px}
 .hero h1 + .sub::after{content:"";flex:1 1 auto;height:2px;max-width:220px;background:linear-gradient(90deg,var(--gold),transparent)}
 @media (max-width:560px){ .hero h1{font-size:34px} .hero h1 + .sub{font-size:15px} .brand b{font-size:20px} .logo{width:34px;height:34px} }
-/* 文型標籤【…】：目錄紅色小標 */
-.gpat{color:var(--alert);background:#fbecea;border-radius:6px;padding:0 4px;margin-left:2px;font-weight:700;-webkit-box-decoration-break:clone;box-decoration-break:clone}
-h1 .gpat{padding:0 6px}
-.tag .gpat,.src .gpat{background:transparent;padding:0;margin:0}
-.sres .gpat{background:transparent;padding:0;font-weight:600}
+/* 文型標籤【…】：紅字粗體（無底色） */
+.gpat{color:var(--alert);font-weight:700}
+.sres .gpat{font-weight:600}
 
 /* 🔍 搜尋：聽力模式／播放 */
 .scbar{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;margin:-4px 0 6px}
