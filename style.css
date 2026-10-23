@@ -359,13 +359,17 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .lrv{cursor:pointer;border-radius:8px}
 .lrv:hover{background:rgba(0,0,0,.03)}
 
-/* 💬 場合使用（課外情境例句，非課本原文） */
-.situsec{background:#f7fbff;border-color:#d6e4f2}
+/* 💬 場合使用（課外情境例句，非課本原文）：每個情境一個本文式的淡藍色對話框 */
+.situsec{margin-top:18px}
+.situsec .splithead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.situsec .splithead h2{font-size:17px;margin:0}
 .xtra-badge,.tag.xtra{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#e8f0fa;color:#2a5d93;border:1px dashed #9dbbe0;font-weight:600}
-.situgrp{margin-top:10px;border-top:1px dashed #d6e4f2;padding-top:8px}
-.situgrp > summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:6px 2px;list-style:none;display:flex;align-items:center;gap:6px}
-.situgrp > summary::-webkit-details-marker{display:none}
-.situgrp > summary::before{content:'▸';color:#5b7fa8;transition:transform .15s}
-.situgrp[open] > summary::before{transform:rotate(90deg)}
-.situgrp > .lines{margin:6px 0 8px}
+.script.situgrp{background:#f1f7fd;border-color:#cfe0f1;box-shadow:0 1px 0 #e3eefa inset,0 2px 8px rgba(40,90,150,.07);margin-top:12px;padding-top:12px}
+.script.situgrp::before,.script.situgrp::after{display:none}
+.situgrp > .situhead{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#33557a;padding:2px 6px 6px}
+.situgrp > .situhead::-webkit-details-marker{display:none}
+.situgrp > .situhead::after{content:'▾';margin-left:auto;color:#6d8fb5;transition:transform .15s}
+.situgrp:not([open]) > .situhead{padding-bottom:0}
+.situgrp:not([open]) > .situhead::after{transform:rotate(-90deg)}
+.sittag{display:inline-block;font-size:11px;font-weight:600;color:#3d6a99;border:1px solid #b9d0ea;border-radius:999px;padding:0 8px;background:#fff}
 .spk.C{background:#eaf6ec;color:#2f7d32}

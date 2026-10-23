@@ -584,7 +584,7 @@ let current = null; // {type, d, idxs}
 // ---- 本文／實用會話：仿課本的對話框排版（一個輪次一行：說話者｜文字）----
 const SPK_COLORS = ['#1b5fa8','#be1e2d','#2f7d32','#8a4fbf','#b8620b','#0f7c86'];
 function isNarr(d){ const ss = new Set(d.lines.filter(l=>!l.scene).map(l=>l.s)); return ss.size===1; }
-function spkColor(d, s){ const ks = Object.keys(d.sp).filter(k=>k!=='S'); return SPK_COLORS[Math.max(0, ks.indexOf(s)) % SPK_COLORS.length]; }
+function spkColor(d, s){ if(d.situ) return SPK_COLORS[Math.max(0, 'ABCDEF'.indexOf(String(s).replace(/^\d+/, ''))) % SPK_COLORS.length]; const ks = Object.keys(d.sp).filter(k=>k!=='S'); return SPK_COLORS[Math.max(0, ks.indexOf(s)) % SPK_COLORS.length]; }
 function maskHTML(t){ const n = Math.max(3, [...t.replace(/[（）]/g,'')].length), per = 22; let h = '';
   for(let r = n; r > 0; r -= per) h += `<span class="mask" style="width:${Math.min(r, per)*0.95+0.5}em"></span>`;
   return h + `<span class="sr">（點一下顯示日文）</span>`; }
@@ -657,11 +657,10 @@ function splitHTML(d){ const v = SPLITD[d.id]; if(!v) return '';
         <div class="lines">${g.idx.map(k => lineHTML(v, k)).join('')}</div></div>`; }).join('')}
   </section>`; }
 function situHTML(d){ const v = SITUD[d.id]; if(!v) return '';
-  return `<section class="splitsec situsec" aria-label="場合使用">
+  return `<section class="situsec" aria-label="場合使用">
     <div class="splithead"><h2>💬 場合使用</h2><span class="xtra-badge">課外情境例句（非課本原文）</span><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button></div>
-    <div class="small mute">用這段本文的句型，換到其他生活場合（N5–N4 程度）。不是課本內容，課本原文請看上面。點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。</div>
-    ${v.groups.map(g => `<details class="situgrp"${g.si===0?' open':''}><summary>🎬 情境${g.si+1}：${esc(g.t)}<span class="small mute">（${g.idx.length} 句）</span></summary>
-        <div class="lines">${g.idx.map(k => lineHTML(v, k)).join('')}</div></details>`).join('')}
+    <div class="small mute">用這段本文的句型，換到其他生活場合（N5–N4 程度）。不是課本內容，課本原文請看上面。</div>
+    ${v.groups.map(g => `<details class="script situgrp"${g.si===0?' open':''}><summary class="situhead"><span class="sittag">🎬 情境${g.si+1}</span>${esc(g.t)}</summary>${g.idx.map(k => rowHTML(v, k)).join('')}</details>`).join('')}
   </section>`; }
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
