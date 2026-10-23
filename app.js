@@ -11,6 +11,11 @@ function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
 S.listenFirst = true;
 function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); }
 try{ if(JSON.parse(localStorage.getItem(LS_KEY)||'{}').listenFirst !== undefined) save(); }catch(e){}
+// 本文改為「一張卡片＝課本一個說話輪次」(turns v1)：複習清單裡舊的逐句編號換成新卡片編號
+if(!S.turns){ try{ const R = {}; Object.entries(S.review).forEach(([k, v]) => { const [id, i] = k.split(':'); const d = B.dialogues.find(x => x.id===id);
+    const nk = d && d.remap ? `${id}:${d.remap[+i]}` : k; if(d && d.remap && d.remap[+i]==null) return;
+    if(R[nk]){ R[nk].n = (R[nk].n||0) + (v.n||0); R[nk].t = Math.max(R[nk].t||0, v.t||0); } else R[nk] = v; });
+  S.review = R; }catch(e){} S.turns = 1; save(); }
 const DLG = {}; B.dialogues.forEach(d => DLG[d.id] = d);
 const LESSON = {}; B.lessons.forEach(l => LESSON[l.n] = l);
 // 同文型聽力練習：每個文型一組例句，當成「虛擬對話」放進 DLG，播放／顯示／測驗／複習共用同一套機制
@@ -158,8 +163,8 @@ function srcHTML(d, i){
   if(d.drill) return drillSrcHTML(d, i);
   const ln = d.lines[i]; const L = LESSON[d.l];
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》第${d.l}課「${esc(L.t)}」（${esc(L.zh)}）</div>`;
-  h += d.src ? `<div style="margin-top:4px"><span class="tag txt">課本原文</span> 第${d.l}課・${esc(d.src.label)}「${esc(d.title)}」<b>p.${d.src.page}</b>・第${i+1}句</div>`
-             : `<div style="margin-top:4px"><span class="tag">實用會話</span> 依第${d.l}課（及之前）文型自編・對話 ${esc(d.id)} 第${i+1}句</div>`;
+  h += d.src ? `<div style="margin-top:4px"><span class="tag txt">課本原文</span> 第${d.l}課・${esc(d.src.label)}「${esc(d.title)}」<b>p.${d.src.page}</b>・${lineNo(d,i).lab}</div>`
+             : `<div style="margin-top:4px"><span class="tag">實用會話</span> 依第${d.l}課（及之前）文型自編・對話 ${esc(d.id)} ${lineNo(d,i).lab}</div>`;
   if(ln.g.length){
     h += `<div style="margin-top:6px"><b>文型</b></div>`;
     ln.g.forEach(k => { const g = B.grammar[k]; if(!g) return;
@@ -364,7 +369,9 @@ function drillNo(ln){
   if(t[0]==='※') return {pre:'', lab:'※參考'+(t.slice(1).trim()?' '+t.slice(1).trim():'')};
   return null;
 }
-function lineNo(d, i){ const ln = d.lines[i]; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; } return {pre:'', lab:`第${i+1}句`}; }
+function lineNo(d, i){ const ln = d.lines[i]; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
+  if(ln.scene) return {pre:'', lab:'課本場景標示'};   // 本文：場景卡片不算句數；其餘一張＝課本一個說話輪次／段落
+  return {pre:'', lab:`第${d.lines.slice(0, i+1).filter(l => !l.scene).length}句`}; }
 let PM = null;   // 目前開著的課本頁視窗：{el, mode:'side'|'modal', id, ps, i, zoom, go, zoomTo}
 const SIDE_MIN = 1100; // 寬螢幕：在內容右側開側邊視窗；較窄（手機）用全螢幕覆蓋
 function bookTitle(d){ return d.drill ? gLabel(d.drill).replace(/ p\.[\d・–]+$/,'') : d.src ? `第${d.l}課 ${d.src.label}` : `實用會話 ${d.id}（依據的文型頁）`; }
@@ -516,9 +523,9 @@ function buildQuiz(scope){
   if(scope==='review') items = Object.keys(S.review).map(k=>{ const [id,i]=k.split(':'); return [DLG[id], +i]; }).filter(x=>x[0]&&x[0].lines[x[1]]);
   else if(scope[0]==='L'){ const n = +scope.slice(1); (n===0 ? FLOW[0] : B.dialogues.filter(d=>d.l===n)).forEach(d=>d.lines.forEach((ln,i)=>items.push([d,i]))); }
   else { const d = DLG[scope]; if(d) d.lines.forEach((ln,i)=>items.push([d,i])); }
-  items = items.filter(([d,i]) => d.lines[i].ja.length >= 4);
+  items = items.filter(([d,i]) => d.lines[i].ja.length >= 4 && !d.lines[i].scene);
   items = shuffle(items).slice(0, scope[0]==='L' ? 10 : 8);
-  const pool = B.dialogues.flatMap(d => d.lines.map((ln,i)=>({d,i,ln})));
+  const pool = B.dialogues.flatMap(d => d.lines.map((ln,i)=>({d,i,ln}))).filter(p => !p.ln.scene);
   return items.map(([d,i], qi) => {
     const ln = d.lines[i]; const type = qi % 2 === 0 ? 'hear' : 'mean';
     const field = type==='hear' ? 'ja' : 'zh';

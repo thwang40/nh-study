@@ -1,4 +1,4 @@
-const SHELL = 'nh-shell-v16', AUDIO = 'nh-audio-v7', PAGES = 'nh-pages-v1';
+const SHELL = 'nh-shell-v17', AUDIO = 'nh-audio-v8', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'];
 self.window = self; importScripts('data.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));
@@ -15,10 +15,12 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
-    // v6 -> v7: only the drill audio (audio/g*) changed; carry the unchanged dialogue audio over instead of re-downloading
-    if (await caches.has('nh-audio-v6')) {
-      const o = await caches.open('nh-audio-v6'), n = await caches.open(AUDIO);
-      for (const r of await o.keys()) if (!/\/g\d+-\d+_/.test(new URL(r.url).pathname) && !(await n.match(r))) await n.put(r, await o.match(r));
+    // v7 -> v8: only 本文 audio (audio/<n>-T<m>_*) changed (one file per speaker turn now); carry everything else over
+    // (v6 -> v8: drill audio audio/g* changed too)
+    for (const [old, changed] of [['nh-audio-v7', /\/\d+-T\d+_/], ['nh-audio-v6', /\/(\d+-T\d+|g\d+-\d+)_/]]) {
+      if (!(await caches.has(old))) continue;
+      const o = await caches.open(old), n = await caches.open(AUDIO);
+      for (const r of await o.keys()) if (!changed.test(new URL(r.url).pathname) && !(await n.match(r))) await n.put(r, await o.match(r));
     }
     for (const k of await caches.keys()) if (![SHELL, AUDIO, PAGES].includes(k)) await caches.delete(k);
     await self.clients.claim();
