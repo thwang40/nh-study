@@ -179,7 +179,7 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .srow .srcbox{grid-column:1/-1}
 .srow .srcbox:empty{display:none}
 @media (max-width:560px){
-  .script{padding:10px 6px}
+  .script{padding:22px 6px 10px}
   .srow{grid-template-columns:minmax(0,1fr) auto;row-gap:0}
   .srow .sname{text-align:left;font-size:13px;padding-top:2px}
   .srow .sname .colon{display:none}
