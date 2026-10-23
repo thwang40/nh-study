@@ -151,6 +151,8 @@ async function playSeq(d, idxs, gap=700, repeat=1){
 
 /* ---------------- helpers ---------------- */
 function lessonLabel(l){ return l===0 ? '入門' : `第${l}課`; }
+// 文型標籤【…】另外上色
+function patHTML(t){ return esc(t).replace(/【([^】]*)】/g, '<span class="gpat">【$1】</span>'); }
 function gLabel(key){
   const g = B.grammar[key]; if(!g) return key;
   const [l,n] = key.split('-');
@@ -159,8 +161,8 @@ function gLabel(key){
 function vLabel(w){ const v = B.vocab[w]; if(!v) return ''; return v.l==='補' ? '補充單字' : lessonLabel(v.l); }
 function drillSrcHTML(d, i){
   const ln = d.lines[i], k = d.drill, g = B.grammar[k];
-  let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${esc(gLabel(k))}</div>`;
-  h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${esc(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${lineNo(d,i).pre?`・${esc(lineNo(d,i).pre)}`:''}・${esc(lineNo(d,i).lab)}</div>`;
+  let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${patHTML(gLabel(k))}</div>`;
+  h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${patHTML(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${lineNo(d,i).pre?`・${esc(lineNo(d,i).pre)}`:''}・${esc(lineNo(d,i).lab)}</div>`;
   h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div></div>`;
   if(ln.x && ln.x.length) h += `<div class="srch"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
   return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">🎧 這個文型的全部練習 ›</a></div></div>`;
@@ -181,7 +183,7 @@ function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速�
 function drillsHTML(keys, skip){
   keys = keys.filter(k => DRILL[k] && k !== skip); if(!keys.length) return '';
   return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">課本文型例句（標頁碼），先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
-    return `<details class="drill" data-blk ${n===0?'open':''}><summary>${esc(gLabel(k))}（${d.lines.length} 句）</summary>
+    return `<details class="drill" data-blk ${n===0?'open':''}><summary>${patHTML(gLabel(k))}（${d.lines.length} 句）</summary>
     <div class="row drillbar"><button class="btn sm" data-act="dall" data-d="${d.id}">▶ 全部播放</button>${speedSegHTML()}<a class="btn sm ghost" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗</a><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">全頁 ›</a>${blkBtn(false)}</div>
     <div class="dlines">${d.lines.map((_, i) => drillLineHTML(d, i)).join('')}</div></details>`; }).join('') + `</div>`;
 }
@@ -191,7 +193,7 @@ function situSrcHTML(d, i){
   if(ln.g.length){
     h += `<div class="srch"><b>文型</b></div>`;
     ln.g.forEach(k => { const g = B.grammar[k]; if(!g) return;
-      h += `<div class="gent"><span class="tag">${esc(gLabel(k))}</span><div class="small">${esc(g.zh)}</div></div>`; });
+      h += `<div class="gent"><span class="tag">${patHTML(gLabel(k))}</span><div class="small">${esc(g.zh)}</div></div>`; });
   }
   if(ln.note) h += `<div class="small srtip">💡 ${esc(ln.note)}</div>`;
   if(ln.w && ln.w.length) h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.w.map(([w,r,zh]) => `<span>${esc(w)}${r!==w?`（${esc(r)}）`:''}＝${esc(zh)}</span>`).join('') + `</div>`;
@@ -207,7 +209,7 @@ function srcHTML(d, i){
   if(ln.g.length){
     h += `<div class="srch"><b>文型</b></div>`;
     ln.g.forEach(k => { const g = B.grammar[k]; if(!g) return;
-      h += `<div class="gent"><span class="tag">${esc(gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
+      h += `<div class="gent"><span class="tag">${patHTML(gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
   }
   if(ln.v.length){
     h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.v.map(w => { const v = B.vocab[w]; if(!v) return '';
@@ -320,7 +322,7 @@ function viewLesson(n){
   bindPlayer();
 }
 
-function gItemHTML(k, g){ return `<div class="g"><b>${esc(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
+function gItemHTML(k, g){ return `<div class="g"><b>${patHTML(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
 // ---- 文型／同文型頁：仿課本「文型 1」排版（標題句 → 1) 2) …；A/B 子行；練習・※ 小節；表格類精簡列）----
 function drillParse(d){
   const cnt = {}; d.lines.forEach(l => { const t = (l.tag||'').trim(); cnt[t] = (cnt[t]||0) + 1; });
@@ -360,7 +362,7 @@ function viewDrill(k){
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › ${n?'同文型練習':esc(g.p)}</div>
   <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
-  <div class="hrow"><h1>🎧 ${esc(gLabel(k))}</h1>${bookBtnHTML(d)}</div>
+  <div class="hrow"><h1>🎧 ${patHTML(gLabel(k))}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
   <div class="script dscript" id="lines" data-blk><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span>${blkBtn(false)}</div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
@@ -372,7 +374,7 @@ function viewDrill(k){
   bindPlayer();
 }
 function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
-  return `<a class="card gcard" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
+  return `<a class="card gcard" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${patHTML(g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
 function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
@@ -759,7 +761,7 @@ function renderQ(){
   const q = Q.qs[Q.idx]; current = null;
   $('#view').innerHTML = `
   <div class="crumb"><a href="${Q.back}">‹ ${esc(Q.backName)}</a></div>
-  <h1>${esc(Q.title)}</h1>
+  <h1>${patHTML(Q.title)}</h1>
   <div class="small mute">第 ${Q.idx+1} / ${Q.qs.length} 題・答對 ${Q.score}</div>
   <div class="bar"><i style="width:${Q.idx/Q.qs.length*100}%"></i></div>
   <div class="card" style="margin-top:10px">
@@ -1084,7 +1086,7 @@ function viewSearch(q){
   const byL = {}; res.forEach(o => (byL[o.l] = byL[o.l] || []).push(o));
   const MAX = 400; let shown = 0;
   const item = (o, n) => { const hitJ = o.nj.includes(nq), hitK = !hitJ && o.nk.includes(nq), hitZ = o.nz.includes(nq);
-    return `<a class="sres" href="${o.href}" data-hl="${o.key||''}" data-n="${n}"><div class="srtop"><span class="sbadge ${SQ_BADGE[o.t]}">${SQ_LAB[o.t]||o.t}</span>${o.who?`<b class="swho2">${esc(o.who)}</b>`:''}<span class="small mute">${esc(o.src)}${o.pg?`・p.${o.pg}`:''}</span></div>
+    return `<a class="sres" href="${o.href}" data-hl="${o.key||''}" data-n="${n}"><div class="srtop"><span class="sbadge ${SQ_BADGE[o.t]}">${SQ_LAB[o.t]||o.t}</span>${o.who?`<b class="swho2">${esc(o.who)}</b>`:''}<span class="small mute">${patHTML(o.src)}${o.pg?`・p.${o.pg}`:''}</span></div>
       <div class="ja">${hitJ ? sqHi(o.ja, nq) : esc(o.ja)}</div>${(hitK || S.showKana) && o.kana !== o.ja ? `<div class="kana">${hitK ? sqHi(o.kana, nq) : esc(o.kana)}</div>` : ''}<div class="zh">${hitZ ? sqHi(o.zh, nq) : esc(o.zh)}</div></a>`; };
   let n = 0;
   const groups = Object.keys(byL).sort((a, b) => (isNaN(a) ? 99 : +a) - (isNaN(b) ? 99 : +b)).map(l => { const L = LESSON[l]; const list = byL[l];
