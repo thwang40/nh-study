@@ -358,3 +358,14 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .splitsrc .spk{margin-right:4px}
 .lrv{cursor:pointer;border-radius:8px}
 .lrv:hover{background:rgba(0,0,0,.03)}
+
+/* 💬 場合使用（課外情境例句，非課本原文） */
+.situsec{background:#f7fbff;border-color:#d6e4f2}
+.xtra-badge,.tag.xtra{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#e8f0fa;color:#2a5d93;border:1px dashed #9dbbe0;font-weight:600}
+.situgrp{margin-top:10px;border-top:1px dashed #d6e4f2;padding-top:8px}
+.situgrp > summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:6px 2px;list-style:none;display:flex;align-items:center;gap:6px}
+.situgrp > summary::-webkit-details-marker{display:none}
+.situgrp > summary::before{content:'▸';color:#5b7fa8;transition:transform .15s}
+.situgrp[open] > summary::before{transform:rotate(90deg)}
+.situgrp > .lines{margin:6px 0 8px}
+.spk.C{background:#eaf6ec;color:#2f7d32}
