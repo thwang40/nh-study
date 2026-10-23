@@ -459,6 +459,24 @@ function playerHTML(noMode){
   </div></div>`;
 }
 let current = null; // {type, d, idxs}
+// ---- 本文／實用會話：仿課本的對話框排版（一個輪次一行：說話者｜文字）----
+const SPK_COLORS = ['#1b5fa8','#be1e2d','#2f7d32','#8a4fbf','#b8620b','#0f7c86'];
+function isNarr(d){ const ss = new Set(d.lines.filter(l=>!l.scene).map(l=>l.s)); return ss.size===1; }
+function spkColor(d, s){ const ks = Object.keys(d.sp).filter(k=>k!=='S'); return SPK_COLORS[Math.max(0, ks.indexOf(s)) % SPK_COLORS.length]; }
+function maskHTML(t){ const n = Math.max(3, [...t.replace(/[（）]/g,'')].length), per = 22; let h = '';
+  for(let r = n; r > 0; r -= per) h += `<span class="mask" style="width:${Math.min(r, per)*0.95+0.5}em"></span>`;
+  return h + `<span class="sr">（點一下顯示日文）</span>`; }
+function rowHTML(d, i){
+  const ln = d.lines[i], key = d.id+':'+i, sp = d.sp[ln.s];
+  const lv = S.listenFirst ? (reveal[key]||0) : 2, narr = isNarr(d) && !ln.scene;
+  const name = ln.scene ? '' : narr ? '' : `<div class="sname" style="color:${spkColor(d, ln.s)}">${esc(sp.name)}<span class="colon">：</span></div>`;
+  const body = (ln.scene ? '<span class="stag">場景</span>' : '') + (lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja));
+  return `<div class="line srow${ln.scene?' sscene':''}${narr?' snarr':''}" data-key="${key}">${name}
+    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'':lv?'顯示中文':'顯示日文'}">${body}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button>${ln.scene?'':`<button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button>`}<button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="srcbox" id="src-${key.replace(':','_')}"></div>
+  </div>`;
+}
 function viewDialogue(id){
   const d = DLG[id]; if(!d) return viewHome();
   renderSide(d.l); reveal = {};
@@ -470,7 +488,8 @@ function viewDialogue(id){
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
-  <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
+  <div class="script${isNarr(d)?' narr':''}" id="lines">${d.lines.map((_,i)=>rowHTML(d,i)).join('')}</div>
+  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>
   </div>
@@ -480,7 +499,7 @@ function viewDialogue(id){
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
   const box = el.querySelector('.srcbox').innerHTML;
-  el.outerHTML = lineHTML(d, i, opts);
+  el.outerHTML = el.classList.contains('srow') ? rowHTML(d, i) : lineHTML(d, i, opts);
   const nel = document.querySelector(`.line[data-key="${key}"]`); nel.querySelector('.srcbox').innerHTML = box;
 }
 function bindPlayer(){
@@ -623,6 +642,7 @@ document.addEventListener('click', e => {
 $('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
 $('#settingsBtn').onclick = openSettings;
 $('#sheet').addEventListener('click', e => { if(e.target.id==='sheet') closeSheet(); });
+document.addEventListener('keydown', e => { if((e.key==='Enter' || e.key===' ') && e.target.matches && e.target.matches('[role="button"][data-act]')){ e.preventDefault(); e.target.click(); } });
 function closeSheet(){ $('#sheet').classList.add('hidden'); }
 async function cacheStatus(){
   if(!('caches' in window)) return '此瀏覽器不支援離線快取';
