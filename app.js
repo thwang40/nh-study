@@ -149,7 +149,7 @@ function drillTextHTML(d, i, lv){
   if(lv<2) return h + `<button class="btn sm ghost" data-act="drv">顯示中文</button>`;
   h += `<div class="zh">${esc(ln.zh)}</div>`;
   if(ln.x && ln.x.length) h += `<div class="small mute">補充單字：${ln.x.map(e=>esc(e.w+'（'+e.r+'）＝'+e.zh)).join('、')}</div>`;
-  return h;
+  return h + `<button class="btn sm ghost" data-act="drv">隱藏</button>`;
 }
 function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速度"><button data-act="spd" data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-act="spd" data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>`; }
 function drillsHTML(keys, skip){
@@ -280,7 +280,7 @@ function drillRowHTML(d, i, P){
                      : (r.who ? `<span class="swho inl" style="color:${r.color}">${esc(r.who)}：</span>` : '') + maskHTML(ln.ja);
   const pre = (r.pg ? `<div class="spg">p.${r.pg}</div>` : '') + (r.head ? `<div class="shead">${esc(r.head)}</div>` : '');
   return pre + `<div class="line srow drow k-${r.kind}${r.left?' first':''}" data-key="${key}"><div class="snum">${esc(r.left)}</div>
-    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'':lv?'顯示中文':'顯示日文'}">${body}</div>
+    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
     <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
     <div class="srcbox" id="src-${key.replace(':','_')}"></div>
   </div>`;
@@ -297,7 +297,7 @@ function viewDrill(k){
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
   <div class="script dscript" id="lines"><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span></div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
-  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
+  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗：聽到的是哪一句？／意思是？</a>
   </div>
@@ -477,7 +477,7 @@ function lineHTML(d, i, opts={}){
     ${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
     ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}
     <div class="reveal-actions">
-      ${lv===1?`<button class="btn sm ghost" data-act="rv" data-k="${key}">顯示中文</button>`:''}
+      ${lv===1?`<button class="btn sm ghost" data-act="rv" data-k="${key}">顯示中文</button>`:lv===2&&S.listenFirst?`<button class="btn sm ghost" data-act="rv" data-k="${key}">隱藏</button>`:''}
       <button class="btn sm alt" data-act="idk" data-d="${d.id}" data-i="${i}">🙋 我不會</button>
       ${inRev && opts.review?`<button class="btn sm ok" data-act="got" data-k="${key}">✓ 我會了</button>`:''}
     </div>
@@ -505,7 +505,7 @@ function rowHTML(d, i){
   const name = ln.scene ? '' : narr ? '' : `<div class="sname" style="color:${spkColor(d, ln.s)}">${esc(sp.name)}<span class="colon">：</span></div>`;
   const body = (ln.scene ? '<span class="stag">場景</span>' : '') + (lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja));
   return `<div class="line srow${ln.scene?' sscene':''}${narr?' snarr':''}" data-key="${key}">${name}
-    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'':lv?'顯示中文':'顯示日文'}">${body}</div>
+    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
     <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button>${ln.scene?'':`<button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button>`}<button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
     <div class="srcbox" id="src-${key.replace(':','_')}"></div>
   </div>`;
@@ -550,7 +550,7 @@ function viewDialogue(id){
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
   <div class="script${isNarr(d)?' narr':''}" id="lines">${illHTML(d)}${scriptRowsHTML(d)}</div>
-  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
+  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>
   </div>
@@ -686,7 +686,7 @@ document.addEventListener('click', e => {
   const act = b.dataset.act;
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
   else if(act==='rep'){ playSeq(DLG[b.dataset.d], [+b.dataset.i], 900, 3); toast('重複 3 次'); }
-  else if(act==='rv'){ const k = b.dataset.k; reveal[k] = Math.min(2,(reveal[k]||0)+1); const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
+  else if(act==='rv'){ const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
   else if(act==='idk'){
     const d = DLG[b.dataset.d], i = +b.dataset.i, k = d.id+':'+i;
     reveal[k] = 2; addReview(d, i, '我不會');
@@ -694,7 +694,7 @@ document.addEventListener('click', e => {
     document.getElementById('src-'+k.replace(':','_')).innerHTML = srcHTML(d, i);
     toast('已加入複習清單');
   }
-  else if(act==='drv'){ const el = b.closest('.dline'); const lv = Math.min(2, +el.dataset.lv + 1); el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
+  else if(act==='drv'){ const el = b.closest('.dline'); const lv = (+el.dataset.lv + 1) % 3; el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
   else if(act==='ill'){ openIll(b.dataset.d, +b.dataset.j); }
