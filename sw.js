@@ -1,7 +1,9 @@
-const SHELL = 'nh-shell-v9', AUDIO = 'nh-audio-v6', PAGES = 'nh-pages-v1';
+const SHELL = 'nh-shell-v10', AUDIO = 'nh-audio-v7', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'];
 self.window = self; importScripts('data.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));
+// 同文型聽力練習（課本文型例句）的音檔也預先存離線
+AUDIO_FILES.push(...Object.entries(self.BOOK.drills || {}).flatMap(([k, items]) => items.flatMap((_, i) => [`audio/g${k}_${i}.mp3`, `audio/g${k}_${i}_s.mp3`])));
 async function cacheAudio(){
   const c = await caches.open(AUDIO);
   for (let i = 0; i < AUDIO_FILES.length; i += 10) {
@@ -13,6 +15,11 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
+    // v6 -> v7: only the drill audio (audio/g*) changed; carry the unchanged dialogue audio over instead of re-downloading
+    if (await caches.has('nh-audio-v6')) {
+      const o = await caches.open('nh-audio-v6'), n = await caches.open(AUDIO);
+      for (const r of await o.keys()) if (!/\/g\d+-\d+_/.test(new URL(r.url).pathname) && !(await n.match(r))) await n.put(r, await o.match(r));
+    }
     for (const k of await caches.keys()) if (![SHELL, AUDIO, PAGES].includes(k)) await caches.delete(k);
     await self.clients.claim();
     cacheAudio().catch(() => {});

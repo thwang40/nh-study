@@ -14,8 +14,23 @@ const DRILL = {};
 Object.entries(B.drills||{}).forEach(([k, items]) => { const g = B.grammar[k]; if(!g) return;
   const d = {id:'g'+k, l:g.l, drill:k, title:'同文型練習「'+g.p+'」', scene:g.zh,
     sp:{A:{name:'女',voice:'f'}, B:{name:'男',voice:'m'}},
-    lines: items.map(it => ({s: it.v==='m'?'B':'A', ja:it.ja, kana:it.kana, zh:it.zh, g:[k], v:[], x:it.x||null}))};
+    lines: items.map(it => ({s: it.v[0]==='m'?'B':'A', ja:it.ja, kana:it.kana, zh:it.zh, g:[k], v:[], x:it.x||null, pg:it.pg, tag:it.tag}))};
   DRILL[k] = d; DLG[d.id] = d; });
+// 課本頁序：每課依課本頁面順序交錯排列「本文」與「文型」，同一頁先出現者在前；實用會話（自編）放最後
+const GFIRST = {'1-3':1, '7-5':1}; // 這兩頁課本是「文型」印在「本文」上面（p.26、p.93）
+function flowOf(n){
+  const it = [];
+  B.dialogues.filter(d=>d.l===n && d.src).forEach(d => it.push({d, pg:d.src.page, w:1}));
+  Object.keys(DRILL).filter(k=>DRILL[k].l===n).forEach(k => it.push({d:DRILL[k], pg:B.grammar[k].pg, w:GFIRST[k]?0:2}));
+  it.forEach((x,i)=>x.i=i); it.sort((a,b)=>a.pg-b.pg || a.w-b.w || a.i-b.i);
+  return it.map(x=>x.d).concat(B.dialogues.filter(d=>d.l===n && !d.src));
+}
+const FLOW = {}; for(let n=0; n<=12; n++) FLOW[n] = flowOf(n);
+const FLOW_ALL = [].concat(...Object.keys(FLOW).sort((a,b)=>a-b).map(n=>FLOW[n]));
+const flowNav = d => { const p = FLOW_ALL.indexOf(d); return {prev: FLOW_ALL[p-1], next: FLOW_ALL[p+1]}; };
+const flowName = d => d.drill ? gLabel(d.drill) : d.src ? `第${d.l}課 ${d.src.label}「${d.title}」` : `實用會話 ${d.id}「${d.title}」`;
+function flowNavHTML(d){ const {prev, next} = flowNav(d); const href = x => x.drill ? `#/g/${x.drill}` : `#/d/${x.id}`;
+  return `<div class="row" style="margin-top:8px">${prev?`<a class="btn ghost" style="text-decoration:none" href="${href(prev)}" title="${esc(flowName(prev))}">‹ 上一項</a>`:''}${next?`<a class="btn ghost" style="text-decoration:none" href="${href(next)}" title="${esc(flowName(next))}">下一項 ›</a>`:''}</div>${next?`<div class="small mute">下一項：${esc(flowName(next))}</div>`:''}`; }
 const UNCERTAIN = {};
 const isText = d => !!d.src;
 const srcTag = d => d.src ? `課本原文・${d.src.label}・p.${d.src.page}` : '實用會話（自編）';
@@ -52,6 +67,7 @@ function setPlaying(key){
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${flowName(d)}・第${+i+1}句：${d.lines[+i].ja}` : ''; }
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -109,8 +125,8 @@ function vLabel(w){ const v = B.vocab[w]; if(!v) return ''; return v.l==='補' ?
 function drillSrcHTML(d, i){
   const ln = d.lines[i], k = d.drill, g = B.grammar[k];
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》${esc(gLabel(k))}</div>`;
-  h += `<div style="margin-top:4px"><span class="tag">同文型練習</span> 本 App 依此文型自編例句（只用${d.l?`第${d.l}課及之前`:'生活の言葉'}的文型與單字）・第${i+1}句</div>`;
-  h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`;
+  h += `<div style="margin-top:4px"><span class="tag txt">課本原文</span> ${esc(gLabel(k).replace(/ p\.\d+$/,''))}・<b>p.${ln.pg||g.pg}</b>${ln.tag?`・${esc(ln.tag)}`:''}・第${i+1}句</div>`;
+  h += `<div style="margin:4px 0"><div class="small">${esc(g.zh)}</div></div>`;
   if(ln.x && ln.x.length) h += `<div style="margin-top:6px"><b>補充單字</b></div><div class="vocab">${ln.x.map(e=>`<span>${esc(e.w)}（${esc(e.r)}）＝${esc(e.zh)} <em>補充單字</em></span>`).join('')}</div>`;
   return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">🎧 這個文型的全部練習 ›</a></div></div>`;
 }
@@ -120,7 +136,7 @@ function drillLineHTML(d, i){
 function drillTextHTML(d, i, lv){
   const ln = d.lines[i];
   if(lv<1) return `<button class="hiddenText" data-act="drv">👂 先聽聽看… 點這裡顯示日文</button>`;
-  let h = `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`;
+  let h = `<div class="small mute">p.${ln.pg} ${esc(ln.tag||'')}</div><div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`;
   if(lv<2) return h + `<button class="btn sm ghost" data-act="drv">顯示中文</button>`;
   h += `<div class="zh">${esc(ln.zh)}</div>`;
   if(ln.x && ln.x.length) h += `<div class="small mute">補充單字：${ln.x.map(e=>esc(e.w+'（'+e.r+'）＝'+e.zh)).join('、')}</div>`;
@@ -129,7 +145,7 @@ function drillTextHTML(d, i, lv){
 function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速度"><button data-act="spd" data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-act="spd" data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>`; }
 function drillsHTML(keys, skip){
   keys = keys.filter(k => DRILL[k] && k !== skip); if(!keys.length) return '';
-  return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
+  return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">課本文型例句（標頁碼），先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
     return `<details class="drill" ${n===0?'open':''}><summary>${esc(gLabel(k))}（${d.lines.length} 句）</summary>
     <div class="row drillbar"><button class="btn sm" data-act="dall" data-d="${d.id}">▶ 全部播放</button>${speedSegHTML()}<a class="btn sm ghost" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗</a><a class="btn sm ghost" style="text-decoration:none" href="#/g/${k}">全頁 ›</a></div>
     <div class="dlines">${d.lines.map((_, i) => drillLineHTML(d, i)).join('')}</div></details>`; }).join('') + `</div>`;
@@ -181,13 +197,12 @@ function viewHome(){
   const totalD = B.dialogues.length, doneD = B.dialogues.filter(d=>S.done[d.id]).length;
   $('#view').innerHTML = `
   <h1>文化日本語 第1～12課 聽力練習</h1>
-  <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課收錄課本「本文」原文（標頁碼）＋ 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
+  <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
   <div class="row" style="margin:8px 0 14px">
     <a class="btn" href="#/l/1" style="text-decoration:none">從第1課開始</a>
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${Object.keys(S.review).length}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
-  <a class="card" href="https://thwang40.github.io/jimtof-talk/" style="text-decoration:none;display:block;margin:-4px 0 14px;border-color:#1d4e89"><b>🏭 JIMTOF 出差會話（聽力＋口說）›</b><div class="small mute">另一個網站：展覽攤位、名片、交通、晚餐、棒球的實用句，可錄音對比、跟讀、角色扮演。</div></a>
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
     return `<a class="card" href="#/l/${l.n}"><div class="lnum">第${l.n}課 ${UNCERTAIN[l.n]?'<span class="badge u">部分推定</span>':''}</div><div class="ltitle">${esc(l.t)}</div><div class="small mute">${esc(l.zh)}</div><div class="small mute">${esc(l.topic)}</div>
     <div class="bar"><i style="width:${p.pct}%"></i></div><div class="small mute" style="margin-top:4px">${p.done}/${p.total} 對話${q.length?`・測驗最佳 ${Math.max(...q)}%`:''}</div></a>`; }).join('')}</div>
@@ -198,13 +213,14 @@ function viewHome(){
     <div><b>電腦（Chrome / Edge）</b>：網址列右側的「安裝」圖示，或直接用書籤。</div>
     <div class="mute" style="margin-top:4px">第一次開啟後，音檔會自動存到裝置，之後沒網路也能播放（可在 ⚙︎ 設定中檢查）。</div>
   </div>
-  <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:雀松朱司）。僅供個人學習使用。</div>`;
+  <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），同文型聽力練習全部為課本文型例句與練習例（標頁碼）；標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:雀松朱司）。僅供個人學習使用。</div>
+  <div style="text-align:right;margin:10px 0 4px"><a href="https://thwang40.github.io/jimtof-talk/" style="font-size:11px;color:#9aa0a6;text-decoration:none">展會會話 ›</a></div>`;
 }
 
 function viewLesson(n){
   const L = LESSON[n]; if(!L) return viewHome();
-  renderSide(n);
-  const ds = B.dialogues.filter(d=>d.l===n);
+  renderSide(n); reveal = {};
+  current = {type:'review', keys: FLOW[n].flatMap(d => d.lines.map((_,i)=>d.id+':'+i))};
   const gs = Object.entries(B.grammar).filter(([k,g])=>g.l===n);
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › 第${n}課</div>
@@ -212,17 +228,20 @@ function viewLesson(n){
   <div class="kana">${esc(L.r)}</div><div class="mute">${esc(L.zh)}・${esc(L.topic)}</div>
   ${UNCERTAIN[n]?`<div class="scene">⚠️ 注意：${esc(UNCERTAIN[n])}，其他文型已對照官方資料。</div>`:''}
   <div class="row" style="margin:6px 0"><span class="small mute">課本 p.${L.pages[0]}–${L.pages[1]}</span><a class="btn sm" style="text-decoration:none" href="#/p/${L.n}/0">📄 課本頁面（${L.pages[1]-L.pages[0]+1} 頁）</a></div>
-  <h2>📖 課本原文（本文）</h2>
-  <div class="dlist">${ds.filter(isText).map(dCard).join('')}</div>
+  ${playerHTML()}
+  <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
+  <div class="small mute" style="margin:0 0 8px">「全部播放」會依下面的順序（課本頁序 → 實用會話）一句一句播完整課。</div>
+  ${n===1?`<h2>🌱 生活の言葉（第1課前，p.14–21）</h2><div class="dlist">${FLOW[0].map(fCard).join('')}</div>`:''}
+  <h2>📖 課本內容（依課本頁序：本文＋文型）</h2>
+  <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
   <h2>🎧 實用會話（依本課文型自編）</h2>
-  <div class="dlist">${ds.filter(d=>!isText(d)).map(dCard).join('')}</div>
+  <div class="dlist">${FLOW[n].filter(d=>!d.drill&&!isText(d)).map(fCard).join('')}</div>
   <div class="row" style="margin-top:10px"><a class="btn" style="text-decoration:none" href="#/q/L${n}">✏️ 第${n}課 聽力測驗</a></div>
-  <h2 id="drills">🎧 同文型聽力練習（${gs.length} 個文型）</h2>
-  <div class="glinks">${gs.concat(n===1?Object.entries(B.grammar).filter(([k,g])=>g.l===0):[]).map(([k,g])=>`<a class="card glink" href="#/g/${k}"><b>${esc(gLabel(k))}</b><span class="small mute">${DRILL[k]?DRILL[k].lines.length:0} 句・${S.quiz['g'+k]!=null?`測驗 ${S.quiz['g'+k]}%`:'聽力＋小測驗'}</span></a>`).join('')}</div>
   ${pagesSection(L)}
   <details ${gs.length<=0?'':''}><summary>📚 本課文型（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>
   ${n===1?`<details><summary>📚 生活の言葉（第1課前）</summary><div class="gl">${Object.entries(B.grammar).filter(([k,g])=>g.l===0).map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>`:''}
   <div class="row" style="margin-top:14px">${n>1?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n-1}">‹ 第${n-1}課</a>`:''}${n<12?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n+1}">第${n+1}課 ›</a>`:''}</div>`;
+  bindPlayer();
 }
 
 function gItemHTML(k, g){ return `<div class="g"><b>${esc(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
@@ -230,21 +249,22 @@ function viewDrill(k){
   const d = DRILL[k]; if(!d) return viewHome();
   const g = B.grammar[k], n = d.l, L = LESSON[n];
   renderSide(n || 1); reveal = {};
-  const keys = Object.keys(DRILL), pos = keys.indexOf(k), prevK = keys[pos-1], nextK = keys[pos+1];
   current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › ${L?`<a href="#/l/${n}">第${n}課 ${esc(L.t)}</a>`:`<a href="#/l/1">生活の言葉</a>`} › 同文型練習</div>
-  <div class="small"><span class="badge">同文型聽力練習（自編例句）</span></div>
+  <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
   <h1>🎧 ${esc(gLabel(k))}</h1>
-  <div class="scene">💡 ${esc(g.zh)}<br><span class="small">課本例句（p.${g.pg}）：${esc(g.ex)}</span></div>
+  <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
   <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗：聽到的是哪一句？／意思是？</a>
   </div>
-  <div class="row" style="margin-top:8px">${prevK?`<a class="btn ghost" style="text-decoration:none" href="#/g/${prevK}">‹ 上一個文型</a>`:''}${nextK?`<a class="btn ghost" style="text-decoration:none" href="#/g/${nextK}">下一個文型 ›</a>`:''}</div>`;
+  ${flowNavHTML(d)}`;
   bindPlayer();
 }
+function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
+  return `<a class="card" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'生活の言葉':'文型'}${esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(g.p)}</div><div class="small mute">課本例句 ${d.lines.length} 句</div></a>`; }
 function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
@@ -311,7 +331,7 @@ function lineHTML(d, i, opts={}){
   const lv = S.listenFirst ? (reveal[key]||0) : 2;
   const inRev = !!S.review[key];
   return `<div class="line" data-key="${key}">
-    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${opts.showId?`${d.drill?`文型${d.drill} 練習`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
+    <div class="lhead"><span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg} ${esc(ln.tag||'')}・`:''}${opts.showId?`${d.drill?`文型${d.drill} p.${ln.pg}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}第${i+1}句</span>
       <div class="lbtns"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><button class="ibtn" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次">🔁</button></div></div>
     ${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
     ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}
@@ -335,7 +355,6 @@ function viewDialogue(id){
   const d = DLG[id]; if(!d) return viewHome();
   renderSide(d.l); reveal = {};
   const L = LESSON[d.l]; const ds = B.dialogues.filter(x=>x.l===d.l); const pos = ds.indexOf(d);
-  const nextD = B.dialogues[B.dialogues.indexOf(d)+1];
   current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${d.l}">第${d.l}課 ${esc(L.t)}</a> › ${d.src?esc(d.src.label):'對話 '+d.id}</div>
@@ -346,8 +365,8 @@ function viewDialogue(id){
   <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>
-    ${nextD?`<a class="btn ghost" style="text-decoration:none" href="#/d/${nextD.id}">下一段 ›</a>`:''}
-  </div>`;
+  </div>
+  ${flowNavHTML(d)}`;
   bindPlayer();
 }
 function rerenderLine(d, i, opts){
