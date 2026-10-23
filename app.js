@@ -647,7 +647,7 @@ function viewDialogue(id){
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
-  <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines" data-blk><div class="blkbar">${blkBtn(false)}</div>${illHTML(d)}${scriptRowsHTML(d)}</div>
+  <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines" data-blk><div class="blkbar">${rpOK(d, d.lines.map((_, i) => i)) ? rpBtn(d.id) : ''}${blkBtn(false)}</div>${illHTML(d)}${scriptRowsHTML(d)}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   ${splitHTML(d)}
   ${situHTML(d)}
@@ -670,7 +670,7 @@ function situHTML(d){ const v = SITUD[d.id]; if(!v) return '';
   return `<section class="situsec" aria-label="場合使用">
     <div class="splithead"><h2>💬 場合使用</h2><span class="xtra-badge">課外情境例句（非課本原文）</span><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button></div>
     <div class="small mute">用這段本文的句型，換到其他生活場合（N5–N4 程度）。不是課本內容，課本原文請看上面。</div>
-    ${v.groups.map(g => `<details class="script situgrp" data-blk${g.si===0?' open':''}><summary class="situhead"><span class="sittag">🎬 情境${g.si+1}</span><span class="sittl">${esc(g.t)}</span>${blkBtn(false)}</summary>${g.idx.map(k => rowHTML(v, k)).join('')}</details>`).join('')}
+    ${v.groups.map(g => `<details class="script situgrp" data-blk${g.si===0?' open':''}><summary class="situhead"><span class="sittag">🎬 情境${g.si+1}</span><span class="sittl">${esc(g.t)}</span><span class="sitbtns">${rpOK(v, g.idx) ? rpBtn(v.id, g.si) : ''}${blkBtn(false)}</span></summary>${g.idx.map(k => rowHTML(v, k)).join('')}</details>`).join('')}
   </section>`; }
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
@@ -805,6 +805,165 @@ function finishQ(){
   <div class="row" style="margin-top:12px"><button class="btn" id="again">再測一次</button><a class="btn alt" style="text-decoration:none" href="#/review">📝 複習清單（${revCount()}）</a><a class="btn ghost" style="text-decoration:none" href="${Q.back}">回到${esc(Q.backName)}</a></div></div>`;
   $('#again').onclick = () => viewQuiz(Q.scope);
 }
+
+/* ---------------- 🗣 開口練習（角色扮演） ----------------
+   選一個角色 → 對方的句子照順序播放（文字先隱藏，可點開）→ 輪到你時停下來，只顯示場景／插圖／角色名稱「輪到你了，請開口說」
+   💡 看提示（點了才顯示：說意圖，不翻譯）、🔁 再聽一次對方、🎙 錄音（可選）→「我講完了，看答案」：①原句 ②③另外兩種說法（課外）
+   內容：rp.js（window.RP，點開才載入）；音檔 audio/<對話id>-r_<句號>_<0|1>.mp3（只在播放時下載） */
+const RP_SKIPD = new Set(['8-T1']), RP_SKIPR = new Set(['みんな','ワン・アルン']);
+function rpRoles(d, idxs){ const seen = []; idxs.forEach(i => { const ln = d.lines[i]; if(ln.scene || RP_SKIPR.has(d.sp[ln.s].name) || seen.includes(ln.s)) return; seen.push(ln.s); }); return seen; }
+function rpOK(d, idxs){ return !RP_SKIPD.has(d.id) && rpRoles(d, idxs).length >= 2; }
+function rpBtn(id, g){ return `<button class="rpbtn" data-act="rp" data-d="${id}"${g!=null?` data-g="${g}"`:''} title="選一個角色，輪到你時開口說">🗣 開口練習</button>`; }
+let RPS = null; // {d, idxs, role, pos, title, scene, rv:{}, phase, t0, timer, rec, recUrl, cue}
+let rpLoading = null;
+function loadRP(){ if(window.RP) return Promise.resolve(); if(rpLoading) return rpLoading;
+  rpLoading = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'rp.js'; s.onload = res; s.onerror = () => { rpLoading = null; rej(); }; document.head.appendChild(s); }); return rpLoading; }
+async function rpOpen(id, g){
+  const d = DLG[id]; if(!d) return;
+  const idxs = g!=null && d.groups ? d.groups.find(x => x.si===+g).idx : d.lines.map((_, i) => i);
+  const sg = g!=null && d.groups ? d.groups.find(x => x.si===+g) : null;
+  try{ await loadRP(); }catch(e){ toast('需要網路才能第一次載入開口練習'); return; }
+  stopAll();
+  RPS = {d, idxs, role:null, pos:0, rv:{}, phase:'pick', title: sg ? `💬 情境${sg.si+1}　${sg.t}` : `${d.src ? `第${d.l}課 ${d.src.label}` : `實用會話 ${d.id}`}「${d.title}」`,
+    scene: sg ? sg.t : d.scene, ref: d.situ ? `場合使用（課外）・依第${d.l}課 ${d.src.label}（課本 p.${d.src.page}）` : d.src ? `第${d.l}課 ${d.src.label}・課本 p.${d.src.page}` : `實用會話 ${d.id}（依第${d.l}課文型自編）`};
+  let el = document.getElementById('rpbox');
+  if(!el){ el = document.createElement('div'); el.id = 'rpbox'; el.className = 'rpbox'; el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-label','開口練習'); document.body.appendChild(el); }
+  document.body.style.overflow = 'hidden';
+  try{ history.pushState({rp:1}, ''); RPS.pushed = true; }catch(e){}
+  rpDraw();
+}
+function rpClose(silent){
+  if(!RPS) return; const s = RPS; rpStopRec(); clearInterval(s.timer); RPS = null; stopAll();
+  const el = document.getElementById('rpbox'); if(el) el.remove(); document.body.style.overflow = '';
+  if(s.recUrl) URL.revokeObjectURL(s.recUrl);
+  if(!silent && s.pushed && history.state && history.state.rp) history.back();
+}
+window.addEventListener('popstate', () => { if(RPS){ RPS.pushed = false; rpClose(true); } });
+window.addEventListener('hashchange', () => rpClose(true));
+const rpName = (d, s) => d.sp[s].name;
+const rpMine = ln => !ln.scene && RPS && ln.s === RPS.role;
+function rpIll(){ const s = RPS, d = s.d; if(d.situ) return ''; const L = illList(d); if(!L.length) return '';
+  const i = s.idxs[s.pos]; let j = L.findIndex(e => e[4] && i >= e[4][0] && i <= e[4][1]); if(j < 0) j = L.findIndex(e => !e[4]); if(j < 0) j = 0;
+  const [f,w,h,p] = L[j]; return `<figure class="rpill"><img src="pages/ill2/${f}" width="${w}" height="${h}" alt="課本插圖 p.${p}"><figcaption>插圖 p.${p}</figcaption></figure>`; }
+function rpRowHTML(i){ const s = RPS, d = s.d, ln = d.lines[i], k = 'rp'+i;
+  if(ln.scene) return `<div class="rprow rpscene"><span class="stag">場景</span>${esc(ln.ja)}<span class="zh">${esc(ln.zh)}</span></div>`;
+  const mine = rpMine(ln), lv = mine ? 2 : (s.rv[k]||0);
+  const body = lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
+  return `<div class="rprow${mine?' me':''}"><div class="rpwho" style="color:${spkColor(d, ln.s)}">${esc(rpName(d, ln.s))}${mine?'<span class="rpyou">你</span>':''}</div>
+    <div class="rptext${lv?'':' masked'}"${mine?'':` data-act="rprv" data-k="${k}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}"`}>${body}</div>
+    ${mine?'':`<button class="ibtn s" data-act="rpplay" data-i="${i}" aria-label="再聽一次" title="再聽一次">🔊</button>`}</div>`; }
+function rpDraw(){
+  const s = RPS; if(!s) return; const el = document.getElementById('rpbox'); const d = s.d;
+  const head = `<div class="rphead"><div><div class="rptitle">🗣 開口練習（角色扮演）</div><div class="small mute">${esc(s.title)}</div></div><button class="ibtn" data-act="rpclose" aria-label="關閉">✕</button></div>`;
+  if(s.phase==='pick'){
+    const roles = rpRoles(d, s.idxs);
+    el.innerHTML = `<div class="rpwrap">${head}
+      <div class="rpcard"><div class="rpscn">🎬 ${esc(s.scene)}</div>
+      <div class="rpq">你要扮演誰？</div>
+      <div class="rpchips">${roles.map(r => `<button class="rpchip" data-act="rprole" data-r="${esc(r)}" style="border-color:${spkColor(d, r)};color:${spkColor(d, r)}">${esc(rpName(d, r))}<span class="small mute">（${s.idxs.filter(i => d.lines[i].s===r).length} 句）</span></button>`).join('')}</div>
+      <div class="small mute" style="margin-top:10px">對方的句子會自動播放；輪到你時會停下來。不會先給你中文或日文——想一想這個場合你會怎麼說，開口說出來，再看答案（3 種說法）。</div>
+      <div class="row" style="margin-top:10px">${speedSegHTML()}</div></div></div>`;
+    return;
+  }
+  const shown = s.idxs.slice(0, s.pos).concat(s.phase==='done' ? [] : []);
+  const cur = s.idxs[s.pos], ln = cur!=null ? d.lines[cur] : null;
+  let card = '';
+  if(s.phase==='turn' || s.phase==='ans'){
+    const R = ((window.RP||{})[d.id]||{})[cur] || ['（這句沒有提示）', []];
+    const lastOther = [...s.idxs.slice(0, s.pos)].reverse().find(i => !d.lines[i].scene && d.lines[i].s !== s.role);
+    if(s.phase==='turn'){
+      card = `<div class="rpcard rpturn">
+        ${rpIll()}
+        <div class="rpscn">🎬 ${esc(s.scene)}</div>
+        <div class="rpme"><span class="rpwho" style="color:${spkColor(d, ln.s)}">${esc(rpName(d, ln.s))}</span><span class="rpyou">你</span></div>
+        <div class="rpsay">輪到你了，請開口說 🗣</div>
+        <div class="rptimer small mute" id="rpTimer">⏱ 0 秒</div>
+        <div class="rpcue${s.cue?' open':''}">${s.cue ? `💡 ${esc(R[0])}` : `<button class="btn sm ghost" data-act="rpcue">💡 看提示</button>`}</div>
+        <div class="row rpacts">
+          ${lastOther!=null?`<button class="btn sm ghost" data-act="rpagain" data-i="${lastOther}">🔁 再聽一次對方</button>`:''}
+          ${CAN_REC?`<button class="btn sm ghost${s.rec?' on':''}" data-act="rprec">${s.rec?'⏹ 停止錄音':s.recUrl?'🎙 重錄':'🎙 錄音（可選）'}</button>`:''}
+          <button class="btn" data-act="rpans">我講完了，看答案</button>
+        </div></div>`;
+    } else {
+      const lab = d.situ ? '情境原句' : d.src ? '課本原句' : '會話原句';
+      const one = (n, badge, cls, ja, kana, zh, play) => `<div class="rpopt"><div class="rpn">${n}</div><div class="rpbody"><span class="rptag ${cls}">${badge}</span><div class="ja">${esc(ja)}</div>${S.showKana?`<div class="kana">${esc(kana)}</div>`:''}<div class="zh">${esc(zh)}</div></div><button class="ibtn s" ${play} aria-label="播放" title="播放">🔊</button></div>`;
+      card = `<div class="rpcard rpanswer">
+        <div class="rpme"><span class="rpwho" style="color:${spkColor(d, ln.s)}">${esc(rpName(d, ln.s))}</span><span class="rpyou">你</span><span class="small mute">可以這樣說：</span></div>
+        <div class="rpcue open small">💡 ${esc(R[0])}</div>
+        ${one('①', lab, 'txt', ln.ja, ln.kana, ln.zh, `data-act="rpplay" data-i="${cur}"`)}
+        ${R[1].map((a, j) => one(j?'③':'②', '課外（非課本原文）', 'xtra', a[0], a[1], a[2], `data-act="rpalt" data-i="${cur}" data-a="${j}"`)).join('')}
+        <div class="small mute rpref">① 出處：${esc(s.ref)}・${esc(lineNo(d, cur).lab)}　②③ 為本 App 自編的自然說法（第1～12課程度）</div>
+        <div class="row rpacts">${s.recUrl?`<button class="btn sm ghost" data-act="rpmine">▶ 聽我的錄音</button><button class="btn sm ghost" data-act="rpcmp">🔁 原句＋我的錄音</button>`:''}
+          <button class="btn" data-act="rpnext">繼續 ▶</button></div></div>`;
+    }
+  } else if(s.phase==='done'){
+    card = `<div class="rpcard"><div class="rpsay">🎉 練習完成！</div><div class="small mute">你扮演「${esc(rpName(d, s.role))}」說了 ${s.idxs.filter(i => d.lines[i].s===s.role).length} 句。換個角色再練一次，就能從另一邊聽、另一邊說。</div>
+      <div class="row rpacts"><button class="btn" data-act="rprestart">再練一次</button><button class="btn ghost" data-act="rppick">換角色</button><button class="btn ghost" data-act="rpclose">結束</button></div></div>`;
+  } else if(s.phase==='play'){
+    card = `<div class="rpcard rpplaying"><div class="small mute">🔊 對方說話中…（文字先隱藏，可點一下顯示）</div><button class="btn sm ghost" data-act="rpskip">跳過 ⏭</button></div>`;
+  }
+  el.innerHTML = `<div class="rpwrap">${head}
+    <div class="rpscript">${shown.map(rpRowHTML).join('')}</div>${card}</div>`;
+  if(s.phase==='turn') rpTick();
+  const tgt = el.querySelector('.rpcard'); if(tgt) tgt.scrollIntoView({block:'nearest'});
+}
+function rpTick(){ const s = RPS; clearInterval(s.timer); const f = () => { const t = document.getElementById('rpTimer'); if(!t || !RPS || RPS.phase!=='turn'){ clearInterval(s.timer); return; } t.textContent = `⏱ ${Math.floor((Date.now()-s.t0)/1000)} 秒`; }; f(); s.timer = setInterval(f, 1000); }
+function rpSrc(u){ return `${u}${S.speed<1?'_s':''}.mp3`; }
+async function rpPlayUrl(base, token){ try{ await playMP3(rpSrc(base), token); return true; }catch(e){ return false; } }
+async function rpRun(){
+  const s = RPS; if(!s) return; stopAll(); const token = playToken; const d = s.d;
+  while(RPS===s && s.pos < s.idxs.length){
+    const i = s.idxs[s.pos], ln = d.lines[i];
+    if(rpMine(ln)){ s.phase = 'turn'; s.t0 = Date.now(); s.cue = false; rpDraw(); return; }
+    if(ln.scene){ s.pos++; continue; }
+    s.phase = 'play'; rpDraw();
+    const ok = await rpPlayUrl(`audio/${d.id}_${i}`, token);
+    if(token!==playToken || RPS!==s) return;
+    if(!ok){ await speakTTS(ln.ja, token); if(token!==playToken || RPS!==s) return; }
+    s.pos++; await wait(450); if(token!==playToken || RPS!==s) return;
+  }
+  if(RPS===s){ s.phase = 'done'; rpDraw(); }
+}
+/* 🎙 錄音（可選）：只存在這個畫面，關掉就清除，不上傳 */
+const CAN_REC = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+let rpRecorder = null;
+function rpMime(){ if(!window.MediaRecorder || !MediaRecorder.isTypeSupported) return ''; for(const m of ['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus']) if(MediaRecorder.isTypeSupported(m)) return m; return ''; }
+function rpStopRec(){ if(rpRecorder && rpRecorder.state==='recording') try{ rpRecorder.stop(); }catch(e){} }
+async function rpToggleRec(){
+  const s = RPS; if(!s) return;
+  if(rpRecorder && rpRecorder.state==='recording'){ rpRecorder.stop(); return; }
+  stopAll(); let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}}); }
+  catch(e){ toast(e && e.name==='NotAllowedError' ? '麥克風權限被拒，請到設定允許' : '無法使用麥克風'); return; }
+  const mime = rpMime(), chunks = [];
+  try{ rpRecorder = mime ? new MediaRecorder(stream, {mimeType:mime}) : new MediaRecorder(stream); }catch(e){ rpRecorder = new MediaRecorder(stream); }
+  const r = rpRecorder; let tm = null;
+  r.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+  r.onstop = () => { clearTimeout(tm); stream.getTracks().forEach(t => t.stop()); if(rpRecorder===r) rpRecorder = null;
+    if(RPS!==s) return; if(s.recUrl) URL.revokeObjectURL(s.recUrl); s.recUrl = URL.createObjectURL(new Blob(chunks, {type: r.mimeType || mime || 'audio/mp4'})); s.rec = false; rpDraw(); };
+  r.start(); s.rec = true; rpDraw(); tm = setTimeout(() => { if(r.state==='recording') r.stop(); }, 20000);
+}
+function rpPlayBlob(url){ return new Promise(res => { stopAll(); const a = new Audio(url); a.onended = a.onerror = () => res(); const p = a.play(); if(p && p.catch) p.catch(() => res()); }); }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act^="rp"]'); if(!b) return; const act = b.dataset.act;
+  if(act==='rp'){ e.preventDefault(); rpOpen(b.dataset.d, b.dataset.g); return; }
+  const s = RPS; if(!s) return; const d = s.d;
+  if(act==='rpclose') rpClose();
+  else if(act==='rprole'){ s.role = b.dataset.r; s.pos = 0; s.rv = {}; rpRun(); }
+  else if(act==='rppick'){ stopAll(); s.phase = 'pick'; rpDraw(); }
+  else if(act==='rprestart'){ s.pos = 0; s.rv = {}; rpRun(); }
+  else if(act==='rprv'){ const k = b.dataset.k; s.rv[k] = ((s.rv[k]||0)+1) % 3; const y = b.closest('.rpwrap').parentElement.scrollTop; rpDraw(); document.getElementById('rpbox').scrollTop = y; }
+  else if(act==='rpplay' || act==='rpagain'){ stopAll(); const t = playToken; await rpPlayUrl(`audio/${d.id}_${b.dataset.i}`, t); }
+  else if(act==='rpalt'){ stopAll(); const t = playToken; await rpPlayUrl(`audio/${d.id}-r_${b.dataset.i}_${b.dataset.a}`, t); }
+  else if(act==='rpcue'){ s.cue = true; const c = b.closest('.rpcue'); const R = ((window.RP||{})[d.id]||{})[s.idxs[s.pos]]; c.classList.add('open'); c.textContent = '💡 ' + (R ? R[0] : ''); }
+  else if(act==='rprec') rpToggleRec();
+  else if(act==='rpans'){ rpStopRec(); clearInterval(s.timer); stopAll(); s.phase = 'ans'; rpDraw(); }
+  else if(act==='rpmine'){ if(s.recUrl) rpPlayBlob(s.recUrl); }
+  else if(act==='rpcmp'){ stopAll(); const t = playToken; await rpPlayUrl(`audio/${d.id}_${s.idxs[s.pos]}`, t); if(t!==playToken || !s.recUrl) return; await wait(350); rpPlayBlob(s.recUrl); }
+  else if(act==='rpnext'){ if(s.recUrl){ URL.revokeObjectURL(s.recUrl); s.recUrl = null; } s.pos++; rpRun(); }
+  else if(act==='rpskip'){ stopAll(); s.pos++; rpRun(); }
+});
+document.addEventListener('keydown', e => { if(RPS && e.key==='Escape') rpClose(); });
 
 /* ---------------- global clicks ---------------- */
 document.addEventListener('click', e => {

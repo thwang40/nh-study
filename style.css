@@ -384,3 +384,61 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .situgrp > .situhead::after{margin-left:2px}
 .situgrp .bshow{border-color:#b9d0ea;background:#fff;color:#33557a}
 .situgrp .bshow.on{background:#3d6a99;border-color:#3d6a99;color:#fff}
+
+/* 🗣 開口練習（角色扮演） */
+.rpbtn{font:inherit;font-size:12px;font-weight:600;line-height:1.2;padding:3px 10px;border-radius:999px;border:1px solid #c9a24a;background:#fff4d6;color:#7a5a12;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.rpbtn:hover{background:#ffe9b0}
+.blkbar{gap:6px}
+.situgrp .rpbtn{border-color:#9dbbe0;background:#e8f0fa;color:#2a5d93;margin-left:auto}
+.situgrp .rpbtn + .bshow{margin-left:0}
+.rpbox{position:fixed;inset:0;z-index:60;background:rgba(40,30,20,.45);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px 12px 40px}
+.rpwrap{max-width:720px;margin:0 auto;background:#fffaf0;border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:14px 16px 18px}
+.rphead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.rptitle{font-weight:800;font-size:17px}
+.rpcard{background:#fff;border:1px solid #eadfc8;border-radius:14px;padding:14px;margin-top:10px}
+.rpscn{font-size:14px;color:#6b5a3a;margin-bottom:8px}
+.rpq{font-weight:700;margin:6px 0 8px}
+.rpchips{display:flex;flex-wrap:wrap;gap:8px}
+.rpchip{font:inherit;font-size:16px;font-weight:700;background:#fff;border:2px solid;border-radius:999px;padding:6px 16px;cursor:pointer}
+.rpchip:hover{background:#fff7e6}
+.rpscript{display:grid;gap:4px}
+.rprow{display:grid;grid-template-columns:5.5em minmax(0,1fr) auto;gap:6px;align-items:start;padding:5px 6px;border-radius:10px}
+.rprow.me{background:#fff3d1}
+.rprow .rpwho{font-weight:700;text-align:right;padding-top:3px;font-size:14px}
+.rptext{cursor:pointer;min-height:28px;padding:2px}
+.rprow.me .rptext{cursor:default}
+.rptext .ja{font-size:17px;line-height:1.5}.rptext .kana{font-size:12px}.rptext .zh{font-size:13px;margin-top:2px}
+.rpscene{display:block;font-size:13px;color:#7a6a48;padding:6px}
+.rpscene .zh{margin-left:8px;color:#9a8c70}
+.rpyou{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:#fff;background:var(--red);border-radius:999px;padding:0 7px;vertical-align:middle}
+.rpturn{text-align:center;border:2px solid #e9b949;background:#fffdf5}
+.rpturn .rpme{font-size:18px}
+.rpsay{font-size:22px;font-weight:800;margin:8px 0 2px;color:#7a3b10}
+.rpcue{margin:10px auto 4px;max-width:520px}
+.rpcue.open{background:#fff7dc;border:1px dashed #e3cf98;border-radius:10px;padding:8px 10px;color:#5b4a20;text-align:left}
+.rpacts{justify-content:center;margin-top:12px;gap:8px}
+.rpill{margin:0 auto 8px;max-width:300px}
+.rpill img{width:100%;height:auto;border-radius:10px;border:1px solid #ead7a0}
+.rpill figcaption{font-size:11px;color:#9a8a62;text-align:right}
+.rpanswer .rpme{margin-bottom:6px}
+.rpopt{display:grid;grid-template-columns:1.6em minmax(0,1fr) auto;gap:6px;align-items:start;padding:8px 4px;border-top:1px dashed #eadfc8}
+.rpn{font-size:18px;font-weight:700;color:#8a6d2f;padding-top:2px}
+.rpbody .ja{font-size:18px;line-height:1.5}.rpbody .kana{font-size:12px}.rpbody .zh{font-size:14px}
+.rptag{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;padding:0 8px;margin-bottom:2px}
+.rptag.txt{background:#fde9eb;color:var(--red);border:1px solid #f3c2c7}
+.rptag.xtra{background:#e8f0fa;color:#2a5d93;border:1px dashed #9dbbe0}
+.rpref{margin-top:6px}
+.rpplaying{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.btn.on{background:var(--red);color:#fff}
+@media (max-width:560px){
+  .rpbox{padding:0}
+  .rpwrap{border-radius:0;min-height:100%;padding:12px 10px 24px}
+  .rprow{grid-template-columns:minmax(0,1fr) auto}
+  .rprow .rpwho{grid-column:1/-1;text-align:left;padding:0;font-size:13px}
+  .rpsay{font-size:20px}
+}
+.situgrp > .situhead{flex-wrap:wrap;row-gap:4px}
+.rpscene .zh{display:inline;border:0;padding:0;margin:0 0 0 8px;font-size:12px}
+.rpme .small{margin-left:8px}
+.situgrp > .situhead .sitbtns{display:inline-flex;gap:6px;margin-left:auto;align-items:center}
+.situgrp > .situhead .sitbtns .rpbtn,.situgrp > .situhead .sitbtns .bshow{margin-left:0}
