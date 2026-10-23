@@ -347,3 +347,14 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .pside .pm-wrap.secmode{background:transparent}
 .pside .pm-wrap .secfig figcaption{color:#6b5d50}
 .pm-bar .pmfull{font-size:12px}
+
+/* 🎧 逐句聽力練習（長輪次拆句，原始卡片樣式） */
+.splitsec{margin-top:18px;padding:12px 14px 6px;border:1px solid #eadfce;border-radius:14px;background:#fffdf8}
+.splithead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.splithead h2{font-size:17px;margin:0}
+.splitgrp{margin-top:12px}
+.splitgrp + .splitgrp{border-top:1px dashed #e4d6c2;padding-top:12px}
+.splitsrc{font-size:13px;color:#6b5d50;margin-bottom:6px}
+.splitsrc .spk{margin-right:4px}
+.lrv{cursor:pointer;border-radius:8px}
+.lrv:hover{background:rgba(0,0,0,.03)}

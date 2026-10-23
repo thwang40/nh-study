@@ -18,6 +18,15 @@ if(!S.turns){ try{ const R = {}; Object.entries(S.review).forEach(([k, v]) => { 
   S.review = R; }catch(e){} S.turns = 1; save(); }
 if(!S.unf || typeof S.unf!=='object') S.unf = {};
 const DLG = {}; B.dialogues.forEach(d => DLG[d.id] = d);
+// 逐句聽力練習：同一個人一次說超過 3 句的輪次（data: ln.parts）→ 虛擬對話 <id>-s（一句一張卡片，音檔 audio/<id>-s_<k>.mp3）
+const SPLITD = {};
+B.dialogues.forEach(d => { const lines = [], groups = [];
+  d.lines.forEach((ln, ti) => { if(!ln.parts || !ln.parts.length) return; const g = {ti, idx:[]};
+    ln.parts.forEach((p, j) => { g.idx.push(lines.length); lines.push({s:ln.s, ja:p.ja, kana:p.kana, zh:p.zh, g:p.g||[], v:p.v||[], part:[ti, j], lab:`${lineNo(d, ti).lab}之${j+1}`}); });
+    groups.push(g); });
+  if(!lines.length) return;
+  const v = {id:d.id+'-s', l:d.l, title:d.title, scene:d.scene, sp:d.sp, src:d.src, split:d.id, lines, groups};
+  SPLITD[d.id] = v; DLG[v.id] = v; });
 /* 還不熟悉 checkbox: S.unf[key] = timestamp */
 function ufHTML(key, scene){ if(scene) return ''; const on = !!S.unf[key]; return `<label class="ufam" title="還不熟悉"><input type="checkbox" data-uf="${key}" aria-label="標記為還不熟悉"${on?' checked':''}></label>`; }
 function revCount(){ return new Set(Object.keys(S.review).concat(Object.keys(S.unf||{}))).size; }
@@ -436,7 +445,7 @@ function drillNo(ln){
   if(t[0]==='※') return {pre:'', lab:'※參考'+(t.slice(1).trim()?' '+t.slice(1).trim():'')};
   return null;
 }
-function lineNo(d, i){ const ln = d.lines[i]; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
+function lineNo(d, i){ const ln = d.lines[i]; if(ln.lab) return {pre:'', lab:ln.lab}; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
   if(ln.scene) return {pre:'', lab:'課本場景標示'};   // 本文：場景卡片不算句數；其餘一張＝課本一個說話輪次／段落
   return {pre:'', lab:`第${d.lines.slice(0, i+1).filter(l => !l.scene).length}句`}; }
 let PM = null;   // 目前開著的課本頁視窗：{el, mode:'side'|'modal', id, ps, i, zoom, go, zoomTo}
@@ -530,8 +539,8 @@ function lineHTML(d, i, opts={}){
   return `<div class="line${S.unf[key]?' unf':''}" data-key="${key}">
     <div class="lhead">${ufHTML(key, ln.scene)}<span class="spk ${ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg}${lineNo(d,i).pre?' '+esc(lineNo(d,i).pre):''}・`:''}${opts.showId?`${d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}${esc(lineNo(d,i).lab)}</span>
       <div class="lbtns"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><button class="ibtn" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次">🔁</button></div></div>
-    ${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
-    ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}
+    ${S.listenFirst&&lv>=1?`<div class="lrv" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv===1?'顯示中文':'隱藏'}">`:''}${lv>=1?`<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
+    ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}${S.listenFirst&&lv>=1?'</div>':''}
     <div class="reveal-actions">
       ${lv===1?`<button class="btn sm ghost" data-act="rv" data-k="${key}">顯示中文</button>`:lv===2&&S.listenFirst?`<button class="btn sm ghost" data-act="rv" data-k="${key}">隱藏</button>`:''}
       <button class="btn sm alt" data-act="idk" data-d="${d.id}" data-i="${i}">🙋 我不會</button>
@@ -606,12 +615,22 @@ function viewDialogue(id){
   ${playerHTML()}
   <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines">${illHTML(d)}${scriptRowsHTML(d)}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
+  ${splitHTML(d)}
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>
   </div>
   ${flowNavHTML(d)}`;
   bindPlayer();
 }
+function splitHTML(d){ const v = SPLITD[d.id]; if(!v) return '';
+  const n = v.lines.length;
+  return `<section class="splitsec" aria-label="逐句聽力練習">
+    <div class="splithead"><h2>🎧 逐句聽力練習</h2><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button><span class="small mute">${n} 句</span></div>
+    <div class="small mute">上面有人一次說超過三句，這裡拆成一句一句聽。點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。</div>
+    ${v.groups.map(g => { const ln = d.lines[g.ti];
+      return `<div class="splitgrp"><div class="splitsrc"><span class="spk ${ln.s}">${esc(d.sp[ln.s].name)}</span> ${esc(lineNo(d, g.ti).lab)}（共 ${g.idx.length} 句）・課本 p.${d.src ? d.src.page : ''}</div>
+        <div class="lines">${g.idx.map(k => lineHTML(v, k)).join('')}</div></div>`; }).join('')}
+  </section>`; }
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
   const sb = document.getElementById('src-'+key.replace(':','_'));
@@ -789,7 +808,7 @@ document.addEventListener('keydown', e => { if((e.key==='Enter' || e.key===' ') 
 function closeSheet(){ $('#sheet').classList.add('hidden'); }
 async function cacheStatus(){
   if(!('caches' in window)) return '此瀏覽器不支援離線快取';
-  try{ const ks = await caches.keys(); let n=0; for(const k of ks){ const c = await caches.open(k); const r = await c.keys(); n += r.filter(x=>/\.mp3$/.test(x.url)).length; } return `已離線儲存音檔：${n} / ${B.dialogues.concat(Object.values(DRILL)).reduce((a,d)=>a+d.lines.length*2,0)}`; }catch(e){ return '無法讀取快取狀態'; }
+  try{ const ks = await caches.keys(); let n=0; for(const k of ks){ const c = await caches.open(k); const r = await c.keys(); n += r.filter(x=>/\.mp3$/.test(x.url)).length; } return `已離線儲存音檔：${n} / ${B.dialogues.concat(Object.values(DRILL), Object.values(SPLITD)).reduce((a,d)=>a+d.lines.length*2,0)}`; }catch(e){ return '無法讀取快取狀態'; }
 }
 async function openSettings(){
   $('#sheetBody').innerHTML = `<h2 style="margin-top:0">⚙︎ 設定</h2>
@@ -808,7 +827,7 @@ async function openSettings(){
   document.querySelectorAll('[data-kana]').forEach(b => b.onclick = () => { S.showKana = b.dataset.kana==='1'; save(); openSettings(); route(); });
   $('#dlAll').onclick = async () => {
     if(!('caches' in window)) return toast('不支援');
-    const urls = B.dialogues.concat(Object.values(DRILL)).flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
+    const urls = B.dialogues.concat(Object.values(DRILL), Object.values(SPLITD)).flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
     const c = await caches.open('nh-audio-v6'); let n=0;
     for(const u of urls){ try{ if(!(await c.match(u))) await c.add(u); }catch(e){} n++; if(n%20===0) $('#cacheInfo').textContent = `下載中… ${n}/${urls.length}`; }
     $('#cacheInfo').textContent = await cacheStatus();

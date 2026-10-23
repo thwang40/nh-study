@@ -1,7 +1,9 @@
-const SHELL = 'nh-shell-v32', AUDIO = 'nh-audio-v8', PAGES = 'nh-pages-v1';
+const SHELL = 'nh-shell-v33', AUDIO = 'nh-audio-v9', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','ill.js','sec.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'].concat(["pages/ill2/1-T1_0.webp", "pages/ill2/1-T2_0.webp", "pages/ill2/1-T3_0.webp", "pages/ill2/1-T3_1.webp", "pages/ill2/10-T1_0.webp", "pages/ill2/10-T2_0.webp", "pages/ill2/11-T1_0.webp", "pages/ill2/11-T2_0.webp", "pages/ill2/11-T3_0.webp", "pages/ill2/12-T1_0.webp", "pages/ill2/12-T2_0.webp", "pages/ill2/12-T2_1.webp", "pages/ill2/12-T2_2.webp", "pages/ill2/12-T2_3.webp", "pages/ill2/12-T2_4.webp", "pages/ill2/2-T1_0.webp", "pages/ill2/2-T1_1.webp", "pages/ill2/2-T1_2.webp", "pages/ill2/2-T1_3.webp", "pages/ill2/2-T1_4.webp", "pages/ill2/2-T1_5.webp", "pages/ill2/2-T1_6.webp", "pages/ill2/2-T1_7.webp", "pages/ill2/2-T2_0.webp", "pages/ill2/3-T1_0.webp", "pages/ill2/3-T1_1.webp", "pages/ill2/4-T2_0.webp", "pages/ill2/4-T2_1.webp", "pages/ill2/5-T1_0.webp", "pages/ill2/5-T2_0.webp", "pages/ill2/5-T2_1.webp", "pages/ill2/5-T2_2.webp", "pages/ill2/6-T1_0.webp", "pages/ill2/6-T1_1.webp", "pages/ill2/6-T1_2.webp", "pages/ill2/6-T1_3.webp", "pages/ill2/6-T1_4.webp", "pages/ill2/6-T2_0.webp", "pages/ill2/6-T2_1.webp", "pages/ill2/6-T2_2.webp", "pages/ill2/6-T3_0.webp", "pages/ill2/6-T3_1.webp", "pages/ill2/6-T3_2.webp", "pages/ill2/6-T3_3.webp", "pages/ill2/6-T3_4.webp", "pages/ill2/6-T3_5.webp", "pages/ill2/7-T1_0.webp", "pages/ill2/7-T1_1.webp", "pages/ill2/7-T2_0.webp", "pages/ill2/7-T2_1.webp", "pages/ill2/7-T2_2.webp", "pages/ill2/7-T3_0.webp", "pages/ill2/7-T3_1.webp", "pages/ill2/8-T1_0.webp", "pages/ill2/8-T1_1.webp", "pages/ill2/8-T2_0.webp", "pages/ill2/9-T1_0.webp", "pages/ill2/9-T2_0.webp", "pages/ill2/9-T2_1.webp", "pages/ill2/9-T3_0.webp", "pages/ill2/9-T3_1.webp"]);
 self.window = self; importScripts('data.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));
+// 逐句聽力練習（長輪次拆句）audio/<id>-s_<k>.mp3
+self.BOOK.dialogues.forEach(d => { let k = 0; d.lines.forEach(ln => (ln.parts || []).forEach(() => { AUDIO_FILES.push(`audio/${d.id}-s_${k}.mp3`, `audio/${d.id}-s_${k}_s.mp3`); k++; })); });
 // 同文型聽力練習（課本文型例句）的音檔也預先存離線
 AUDIO_FILES.push(...Object.entries(self.BOOK.drills || {}).flatMap(([k, items]) => items.flatMap((_, i) => [`audio/g${k}_${i}.mp3`, `audio/g${k}_${i}_s.mp3`])));
 async function cacheAudio(){
@@ -15,9 +17,10 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
+    // v8 -> v9: only new files (逐句 audio/<id>-s_*) were added; carry everything over
     // v7 -> v8: only 本文 audio (audio/<n>-T<m>_*) changed (one file per speaker turn now); carry everything else over
     // (v6 -> v8: drill audio audio/g* changed too)
-    for (const [old, changed] of [['nh-audio-v7', /\/\d+-T\d+_/], ['nh-audio-v6', /\/(\d+-T\d+|g\d+-\d+)_/]]) {
+    for (const [old, changed] of [['nh-audio-v8', /(?!)/], ['nh-audio-v7', /\/\d+-T\d+_/], ['nh-audio-v6', /\/(\d+-T\d+|g\d+-\d+)_/]]) {
       if (!(await caches.has(old))) continue;
       const o = await caches.open(old), n = await caches.open(AUDIO);
       for (const r of await o.keys()) if (!changed.test(new URL(r.url).pathname) && !(await n.match(r))) await n.put(r, await o.match(r));
