@@ -581,7 +581,7 @@ function viewDialogue(id){
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
-  <div class="script${isNarr(d)?' narr':''}" id="lines">${illHTML(d)}${scriptRowsHTML(d)}</div>
+  <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines">${illHTML(d)}${scriptRowsHTML(d)}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>

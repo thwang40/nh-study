@@ -319,3 +319,8 @@ body.has-pside .igrp{--igw:122px}
 .src .gent .small{margin-top:2px;line-height:1.55}
 .src .srtip{margin-top:12px}
 .src .vocab{margin-top:4px}
+
+/* single right-side picture: rows keep the same width below the picture (buttons stay in one column) */
+.script.has-ill > .srow{max-width:calc(100% - min(33%, 340px) - 18px)}
+body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 18px)}
+@media (max-width:560px){ .script.has-ill > .srow, body.has-pside .script.has-ill > .srow{max-width:none} }
