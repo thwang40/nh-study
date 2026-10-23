@@ -272,7 +272,7 @@ function viewHome(){
   renderSide('home');
   const totalD = B.dialogues.length, doneD = B.dialogues.filter(d=>S.done[d.id]).length;
   $('#view').innerHTML = `
-  <h1>文化日本語 第1～12課 聽力練習</h1>
+  <div class="hero"><h1>撿角日語</h1><div class="sub">文化日本語 第1～12課 聽力練習</div></div>
   <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
   ${searchFormHTML('', 'home')}
   <div class="row" style="margin:8px 0 14px">
@@ -593,7 +593,7 @@ function blockShow(b){
   b.outerHTML = blkBtn(on);
 }
 // ---- 本文／實用會話：仿課本的對話框排版（一個輪次一行：說話者｜文字）----
-const SPK_COLORS = ['#1b5fa8','#be1e2d','#2f7d32','#8a4fbf','#b8620b','#0f7c86'];
+const SPK_COLORS = ['#1b5fa8','#b5251f','#1d6434','#8a4fbf','#b8620b','#0f7c86'];
 function isNarr(d){ const ss = new Set(d.lines.filter(l=>!l.scene).map(l=>l.s)); return ss.size===1; }
 function spkColor(d, s){ if(d.situ) return SPK_COLORS[Math.max(0, 'ABCDEF'.indexOf(String(s).replace(/^\d+/, ''))) % SPK_COLORS.length]; const ks = Object.keys(d.sp).filter(k=>k!=='S'); return SPK_COLORS[Math.max(0, ks.indexOf(s)) % SPK_COLORS.length]; }
 function maskHTML(t){ const n = Math.max(3, [...t.replace(/[（）]/g,'')].length), per = 22; let h = '';
@@ -802,7 +802,7 @@ function finishQ(){
   if(Q.scope[0]==='L'){ const n=+Q.scope.slice(1); B.dialogues.filter(d=>d.l===n).forEach(d=>{ if(S.quiz[d.id]==null) S.quiz[d.id]=pct; }); save(); }
   $('#view').innerHTML = `<div class="crumb"><a href="${Q.back}">‹ ${esc(Q.backName)}</a></div>
   <h1>${esc(Q.title)}：結果</h1>
-  <div class="card"><div style="font-size:40px;font-weight:800;color:${pct>=80?'var(--ok)':'var(--red)'}">${pct}%</div><div>答對 ${Q.score} / ${Q.qs.length} 題</div>
+  <div class="card"><div style="font-size:40px;font-weight:800;color:${pct>=80?'var(--ok)':'var(--alert)'}">${pct}%</div><div>答對 ${Q.score} / ${Q.qs.length} 題</div>
   <div class="row" style="margin-top:12px"><button class="btn" id="again">再測一次</button><a class="btn alt" style="text-decoration:none" href="#/review">📝 複習清單（${revCount()}）</a><a class="btn ghost" style="text-decoration:none" href="${Q.back}">回到${esc(Q.backName)}</a></div></div>`;
   $('#again').onclick = () => viewQuiz(Q.scope);
 }
