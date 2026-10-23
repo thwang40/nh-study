@@ -507,8 +507,8 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 /* 撿角日語：每一頁（課、本文、文型、會話、搜尋、複習…）內容頂端右側也顯示；頂端深色列的品牌名永遠不被擠掉 */
 .crumb{min-height:1.6em}
 .crumb::before{content:"撿角日語";float:right;margin:-2px 0 0 12px;font-size:20px;font-weight:900;letter-spacing:.08em;line-height:1.1;color:var(--teal);padding-bottom:3px;border-bottom:2px solid var(--gold)}
-.brand{flex:1 1 auto}
+.brand{flex:1 1 auto;min-width:min-content}
 .brand b{overflow:visible;text-overflow:clip}
-.tools{flex:0 1 auto;min-width:0}
+.tools{flex:none}
 @media (max-width:400px){ .crumb::before{font-size:17px} }
 @media (max-width:380px){ .brand small{display:none} .chip{padding:4px 8px;font-size:13px} .tools{gap:4px} }
