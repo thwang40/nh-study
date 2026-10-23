@@ -510,14 +510,28 @@ function rowHTML(d, i){
     <div class="srcbox" id="src-${key.replace(':','_')}"></div>
   </div>`;
 }
+function illList(d){ return (window.ILL||{})[d.id] || []; }
+function illThumb(d, e, j, cls){ const [f,w,h,p] = e; return `<button class="illb${cls||''}" data-act="ill" data-d="${d.id}" data-j="${j}" aria-label="放大插圖（p.${p}）" title="p.${p}"><img src="pages/ill2/${f}" width="${w}" height="${h}" alt="課本插圖 p.${p}" decoding="async"></button>`; }
 function illHTML(d){
-  const L = (window.ILL||{})[d.id]; if(!L || !L.length) return '';
-  return `<div class="ill${L.length>1?' multi':''}${L.length>2?' m3':''}">${L.map(([f,w,h,p],j)=>`<button class="illb" data-act="ill" data-d="${d.id}" data-j="${j}" aria-label="放大插圖（p.${p}）"><img src="pages/ill/${f}" width="${w}" height="${h}" alt="課本插圖 p.${p}" decoding="async"></button>`).join('')}<div class="illcap">插圖 ${[...new Set(L.map(x=>'p.'+x[3]))].join('・')}</div></div>`;
+  const L = illList(d); if(L.length!==1 || L[0][4]) return '';
+  return `<div class="ill">${illThumb(d, L[0], 0)}<div class="illcap">插圖 p.${L[0][3]}</div></div>`;
+}
+/* rows with per-sentence pictures: wrap runs of rows; each run gets its own picture cell */
+function scriptRowsHTML(d){
+  const L = illList(d), rows = d.lines.map((_,i)=>rowHTML(d,i));
+  if(!L.some(e=>e[4])) return rows.join('');
+  const spans = []; L.forEach((e,j)=>{ if(!e[4]) return; const [a,b] = e[4]; let s = spans.find(x=>x.a===a && x.b===b); if(!s) spans.push(s = {a, b, js:[]}); s.js.push(j); });
+  spans.sort((x,y)=>x.a-y.a);
+  let html = '', i = 0;
+  const grp = (a, b, js) => `<div class="igrp${js.length?'':' noimg'}"><div class="igrows">${rows.slice(a, b+1).join('')}</div><div class="igimg${js.length>1?' two':''}">${js.map(j=>illThumb(d, L[j], j)).join('')}</div></div>`;
+  for(const s of spans){ if(s.a > i) html += grp(i, s.a-1, []); html += grp(s.a, s.b, s.js); i = s.b+1; }
+  if(i < rows.length) html += grp(i, rows.length-1, []);
+  return `<div class="igrid">${html}</div><div class="illcap">插圖 ${[...new Set(L.map(x=>'p.'+x[3]))].join('・')}</div>`;
 }
 function openIll(id, j){
   const L = (window.ILL||{})[id]; if(!L) return; let k = j;
   const box = document.createElement('div'); box.className = 'illbox'; box.setAttribute('role','dialog'); box.setAttribute('aria-label','插圖');
-  const draw = () => { const [f,,,p] = L[k]; box.innerHTML = `<img src="pages/ill/${f}" alt="課本插圖 p.${p}"><div class="illbar">${L.length>1?`<button class="ibtn" data-x="prev" aria-label="上一張">‹</button>`:''}<span>p.${p}${L.length>1?`　${k+1} / ${L.length}`:''}</span>${L.length>1?`<button class="ibtn" data-x="next" aria-label="下一張">›</button>`:''}<button class="ibtn" data-x="close" aria-label="關閉">✕</button></div>`; };
+  const draw = () => { const [f,,,p] = L[k]; box.innerHTML = `<img src="pages/ill2/${f}" alt="課本插圖 p.${p}"><div class="illbar">${L.length>1?`<button class="ibtn" data-x="prev" aria-label="上一張">‹</button>`:''}<span>p.${p}${L.length>1?`　${k+1} / ${L.length}`:''}</span>${L.length>1?`<button class="ibtn" data-x="next" aria-label="下一張">›</button>`:''}<button class="ibtn" data-x="close" aria-label="關閉">✕</button></div>`; };
   const close = () => { box.remove(); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', close); };
   const onKey = e => { if(e.key==='Escape') close(); else if(e.key==='ArrowRight' && L.length>1){ k=(k+1)%L.length; draw(); } else if(e.key==='ArrowLeft' && L.length>1){ k=(k+L.length-1)%L.length; draw(); } };
   box.onclick = e => { e.stopPropagation(); const x = e.target.closest('[data-x]'); if(x){ if(x.dataset.x==='close') close(); else { k = (k + (x.dataset.x==='next'?1:L.length-1)) % L.length; draw(); } return; } close(); };
@@ -535,7 +549,7 @@ function viewDialogue(id){
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
-  <div class="script${isNarr(d)?' narr':''}" id="lines">${illHTML(d)}${d.lines.map((_,i)=>rowHTML(d,i)).join('')}</div>
+  <div class="script${isNarr(d)?' narr':''}" id="lines">${illHTML(d)}${scriptRowsHTML(d)}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>
