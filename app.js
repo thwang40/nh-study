@@ -1192,6 +1192,9 @@ async function countView(){
 route();
 setTimeout(countView, 1500); // after first render; never blocks the app
 
+// 頂端列高度（含 iPhone 瀏海）→ CSS --hdr，讓播放列／側欄剛好貼在頂端列下面
+(function(){ const t = document.querySelector('.top'); if(!t) return; const set = () => document.documentElement.style.setProperty('--hdr', t.offsetHeight + 'px');
+  set(); window.addEventListener('resize', set); window.addEventListener('load', set); if(window.ResizeObserver) new ResizeObserver(set).observe(t); })();
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
   // 新版上線後盡快生效：sw.js 不走 HTTP 快取、回到頁面時檢查更新；新版接手後自動重新整理一次（第一次安裝不重整）
   const hadCtl = !!navigator.serviceWorker.controller; let reloaded = false;

@@ -37,7 +37,7 @@ a.card.glink{display:flex}
 .crumb{font-size:13px;margin-bottom:4px}
 .crumb a{color:var(--pri);text-decoration:none}
 .scene{background:#fbf5e8;border-left:4px solid var(--gold);padding:8px 10px;border-radius:8px;font-size:14px;margin:8px 0}
-.player{position:sticky;top:calc(52px + var(--safe-t));z-index:10;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
+.player{position:sticky;top:var(--hdr,calc(52px + var(--safe-t)));z-index:10;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:8px}
 .lines{display:flex;flex-direction:column;gap:10px}
 .line{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;transition:box-shadow .2s,border-color .2s}
 .line.playing{border-color:var(--pri);box-shadow:0 0 0 3px #1d643422}
@@ -86,7 +86,7 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 /* side nav for wide screens (desktop / Fold unfolded) */
 @media (min-width:840px){
   .layout{display:grid;grid-template-columns:260px 1fr;gap:0}
-  .side{display:block;position:sticky;top:52px;align-self:start;height:calc(100vh - 52px);overflow:auto;padding:12px;border-right:1px solid var(--line)}
+  .side{display:block;position:sticky;top:var(--hdr,52px);align-self:start;height:calc(100vh - var(--hdr,52px));overflow:auto;padding:12px;border-right:1px solid var(--line)}
   .side a{display:block;padding:8px 10px;border-radius:10px;text-decoration:none;font-size:14px}
   .side a.cur{background:var(--pale);color:var(--pri);font-weight:700}
   .side a small{display:block;color:var(--mute);font-size:12px}
@@ -142,7 +142,7 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 /* 寬螢幕：課本頁側邊視窗（內容右側，跟著畫面捲動固定） */
 @media (min-width:1100px){
   body.has-pside .layout{max-width:1760px;grid-template-columns:260px minmax(0,1fr) clamp(360px,34vw,600px)}
-  .pside{inset:auto;position:sticky;top:52px;align-self:start;z-index:5;height:calc(100vh - 52px);background:#e9eee6;border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .pside{inset:auto;position:sticky;top:var(--hdr,52px);align-self:start;z-index:5;height:calc(100vh - var(--hdr,52px));background:#e9eee6;border-left:1px solid var(--line);display:flex;flex-direction:column}
   .pside .pm-bar{padding-top:8px}
   .pside .pm-bar .t{flex-basis:100%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pside .pm-bar [data-pm="close"]{position:absolute;right:8px;top:6px;min-height:30px;padding:2px 10px}
@@ -504,3 +504,11 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .sres.playing{border-color:var(--pri);box-shadow:0 0 0 3px #1d643422}
 .sres.playing .splay:not(.big){background:var(--pri);color:#fff;border-color:var(--pri)}
 @media (max-width:560px){ .splay{width:34px;height:30px;font-size:13px} .splay.big{height:34px} }
+/* 撿角日語：每一頁（課、本文、文型、會話、搜尋、複習…）內容頂端右側也顯示；頂端深色列的品牌名永遠不被擠掉 */
+.crumb{min-height:1.6em}
+.crumb::before{content:"撿角日語";float:right;margin:-2px 0 0 12px;font-size:20px;font-weight:900;letter-spacing:.08em;line-height:1.1;color:var(--teal);padding-bottom:3px;border-bottom:2px solid var(--gold)}
+.brand{flex:1 1 auto}
+.brand b{overflow:visible;text-overflow:clip}
+.tools{flex:0 1 auto;min-width:0}
+@media (max-width:400px){ .crumb::before{font-size:17px} }
+@media (max-width:380px){ .brand small{display:none} .chip{padding:4px 8px;font-size:13px} .tools{gap:4px} }
