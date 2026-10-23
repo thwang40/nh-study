@@ -510,7 +510,21 @@ function rowHTML(d, i){
     <div class="srcbox" id="src-${key.replace(':','_')}"></div>
   </div>`;
 }
+function illHTML(d){
+  const L = (window.ILL||{})[d.id]; if(!L || !L.length) return '';
+  return `<div class="ill${L.length>1?' multi':''}${L.length>2?' m3':''}">${L.map(([f,w,h,p],j)=>`<button class="illb" data-act="ill" data-d="${d.id}" data-j="${j}" aria-label="放大插圖（p.${p}）"><img src="pages/ill/${f}" width="${w}" height="${h}" alt="課本插圖 p.${p}" decoding="async"></button>`).join('')}<div class="illcap">插圖 ${[...new Set(L.map(x=>'p.'+x[3]))].join('・')}</div></div>`;
+}
+function openIll(id, j){
+  const L = (window.ILL||{})[id]; if(!L) return; let k = j;
+  const box = document.createElement('div'); box.className = 'illbox'; box.setAttribute('role','dialog'); box.setAttribute('aria-label','插圖');
+  const draw = () => { const [f,,,p] = L[k]; box.innerHTML = `<img src="pages/ill/${f}" alt="課本插圖 p.${p}"><div class="illbar">${L.length>1?`<button class="ibtn" data-x="prev" aria-label="上一張">‹</button>`:''}<span>p.${p}${L.length>1?`　${k+1} / ${L.length}`:''}</span>${L.length>1?`<button class="ibtn" data-x="next" aria-label="下一張">›</button>`:''}<button class="ibtn" data-x="close" aria-label="關閉">✕</button></div>`; };
+  const close = () => { box.remove(); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', close); };
+  const onKey = e => { if(e.key==='Escape') close(); else if(e.key==='ArrowRight' && L.length>1){ k=(k+1)%L.length; draw(); } else if(e.key==='ArrowLeft' && L.length>1){ k=(k+L.length-1)%L.length; draw(); } };
+  box.onclick = e => { e.stopPropagation(); const x = e.target.closest('[data-x]'); if(x){ if(x.dataset.x==='close') close(); else { k = (k + (x.dataset.x==='next'?1:L.length-1)) % L.length; draw(); } return; } close(); };
+  document.addEventListener('keydown', onKey); window.addEventListener('hashchange', close); draw(); document.body.appendChild(box);
+}
 function viewDialogue(id){
+
   const d = DLG[id]; if(!d) return viewHome();
   renderSide(d.l); reveal = {};
   const L = LESSON[d.l]; const ds = B.dialogues.filter(x=>x.l===d.l); const pos = ds.indexOf(d);
@@ -521,7 +535,7 @@ function viewDialogue(id){
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
   ${playerHTML()}
-  <div class="script${isNarr(d)?' narr':''}" id="lines">${d.lines.map((_,i)=>rowHTML(d,i)).join('')}</div>
+  <div class="script${isNarr(d)?' narr':''}" id="lines">${illHTML(d)}${d.lines.map((_,i)=>rowHTML(d,i)).join('')}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 這段的聽力測驗</a>
@@ -669,6 +683,7 @@ document.addEventListener('click', e => {
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = Math.min(2, +el.dataset.lv + 1); el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
+  else if(act==='ill'){ openIll(b.dataset.d, +b.dataset.j); }
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
