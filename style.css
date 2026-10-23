@@ -196,3 +196,35 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .srow.sscene .stext .mask{display:inline-block;margin:0}
 .srow.sscene .stext .kana,.srow.sscene .stext .zh{flex-basis:100%}
 @media (max-width:560px){ .mask{margin:6px 0 7px} }
+/* 文型頁：仿課本「文型 1」 */
+.dscript .dtitle{display:flex;align-items:center;gap:8px;margin:0 6px 4px}
+.dbadge{display:inline-block;background:#8f3b55;color:#fff;font-weight:700;font-size:13px;padding:2px 12px;border-radius:999px 999px 999px 4px}
+.drow{grid-template-columns:3.2em minmax(0,1fr) auto}
+.drow .snum{font-weight:700;color:#6b5a3a;text-align:right;padding-top:4px;font-size:15px;white-space:nowrap}
+.drow.k-main .snum{color:#8f3b55;font-size:13px;padding-top:6px}
+.drow.k-main .stext .ja{font-size:20px;font-weight:600}
+.drow.k-main{background:rgba(255,255,255,.45)}
+.drow.k-main + .drow:not(.k-main){margin-top:6px}
+.drow.first:not(.k-main){margin-top:4px}
+.swho{font-weight:700;margin-right:2px;font-size:.9em}
+.swho.A{color:#1b5fa8}.swho.B{color:#be1e2d}
+.swho.inl{display:inline-block;margin:4px 6px 0 0;font-size:13px}
+.drow .stext .swho.inl + .mask{display:inline-block;vertical-align:middle;margin:6px 0}
+.shead{margin:10px 8px 2px calc(3.2em + 14px);font-size:12px;font-weight:700;color:#8a6d2f;border-bottom:1px dashed #e3cf98;padding-bottom:2px}
+.spg{margin:8px 8px 0;font-size:11px;color:#9a8c70;text-align:right}
+.snote{font-size:12px;color:#8a7a55;margin-top:2px}
+.drow.k-list .snum{display:none}
+.drow.k-list,.drow.k-ex{grid-template-columns:3.2em minmax(0,1fr) auto}
+.drow.k-list .stext{grid-column:2}
+@media (max-width:560px){
+  .drow{grid-template-columns:2em minmax(0,1fr) auto;column-gap:4px;padding:5px 4px}
+  .drow .snum{font-size:14px;padding-top:4px}
+  .drow .stext{grid-column:2;grid-row:1}
+  .drow .sbtns{grid-column:3;grid-row:1;gap:0}
+  .drow .ibtn.s{width:27px;min-width:27px;height:28px;font-size:13px}
+  .drow .stext .ja{font-size:17px}
+  .drow.k-main .stext .ja{font-size:18px}
+  .shead{margin-left:calc(2em + 8px)}
+}
+.drow.k-main + .drow.k-main{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.drow.k-main:has(+ .drow.k-main){border-bottom-left-radius:0;border-bottom-right-radius:0}

@@ -253,6 +253,38 @@ function viewLesson(n){
 }
 
 function gItemHTML(k, g){ return `<div class="g"><b>${esc(gLabel(k))}</b><div class="ex">${esc(g.ex)}</div><div class="small mute">${esc(g.zh)}</div>${DRILL[k]?`<a class="btn sm ghost" style="text-decoration:none;margin-top:6px" href="#/g/${k}">🎧 同文型聽力練習（${DRILL[k].lines.length} 句）</a>`:''}</div>`; }
+// ---- 文型／同文型頁：仿課本「文型 1」排版（標題句 → 1) 2) …；A/B 子行；練習・※ 小節；表格類精簡列）----
+function drillParse(d){
+  const cnt = {}; d.lines.forEach(l => { const t = (l.tag||'').trim(); cnt[t] = (cnt[t]||0) + 1; });
+  let prevNum = null, prevHead = null, prevPg = null;
+  return d.lines.map((ln, i) => {
+    const t = (ln.tag||'').trim(); let m, r = {kind:'other', left:'', who:'', head:'', note:'', pg:null};
+    if((m = t.match(/^文型\s*(.*)$/))){ r.kind = 'main'; r.left = prevNum==='main' ? '' : '文型'; r.who = m[1].replace(/^（(.*)）$/,'$1').trim(); prevNum = 'main'; }
+    else if((m = t.match(/^(\d+)\)\s*(.*)$/))){ r.kind = 'num'; r.left = prevNum===m[1] ? '' : m[1]+')'; r.who = m[2]; prevNum = m[1]; }
+    else if((m = t.match(/^練習(\S+)\s*(例\d*)?\s*(.*)$/))){ r.kind = 'ex'; r.head = `練習${m[1]}${m[2]?' '+m[2]:''}`; r.who = m[3]; prevNum = null; }
+    else if(t[0]==='※'){ r.kind = 'ex'; r.head = '※'; const w = t.slice(1).trim(); if(/^（/.test(w)) r.note = w; else r.who = w; prevNum = null; }
+    else if(t && cnt[t] > 1){ r.kind = 'list'; r.head = t; prevNum = null; }
+    else { r.kind = 'list'; r.note = t; prevNum = null; }
+    if(r.head && r.head === prevHead) r.head = ''; else if(r.head) prevHead = r.head;
+    if(r.kind==='main' || r.kind==='num') prevHead = null;
+    if(ln.pg && prevPg && ln.pg !== prevPg) r.pg = ln.pg; prevPg = ln.pg || prevPg;
+    return r;
+  }).map((r, _, all) => { if(!all.whoIdx){ all.whoIdx = {}; all.forEach(x => { if(x.who && !(x.who in all.whoIdx)) all.whoIdx[x.who] = Object.keys(all.whoIdx).length; }); }
+    r.color = r.who ? SPK_COLORS[all.whoIdx[r.who] % SPK_COLORS.length] : ''; return r; });
+}
+function drillRowHTML(d, i, P){
+  const ln = d.lines[i], key = d.id+':'+i, r = (P || drillParse(d))[i];
+  const lv = S.listenFirst ? (reveal[key]||0) : 2;
+  const who = r.who ? `<span class="swho" style="color:${r.color}">${esc(r.who)}：</span>` : '';
+  const body = lv>=1 ? `<div class="ja">${who}${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}${r.note?`<div class="snote">${esc(r.note)}</div>`:''}`
+                     : (r.who ? `<span class="swho inl" style="color:${r.color}">${esc(r.who)}：</span>` : '') + maskHTML(ln.ja);
+  const pre = (r.pg ? `<div class="spg">p.${r.pg}</div>` : '') + (r.head ? `<div class="shead">${esc(r.head)}</div>` : '');
+  return pre + `<div class="line srow drow k-${r.kind}${r.left?' first':''}" data-key="${key}"><div class="snum">${esc(r.left)}</div>
+    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'':lv?'顯示中文':'顯示日文'}">${body}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="srcbox" id="src-${key.replace(':','_')}"></div>
+  </div>`;
+}
 function viewDrill(k){
   const d = DRILL[k]; if(!d) return viewHome();
   const g = B.grammar[k], n = d.l, L = LESSON[n];
@@ -264,7 +296,8 @@ function viewDrill(k){
   <div class="hrow"><h1>🎧 ${esc(gLabel(k))}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
-  <div class="lines" id="lines">${d.lines.map((_,i)=>lineHTML(d,i)).join('')}</div>
+  <div class="script dscript" id="lines"><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span></div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
+  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗：聽到的是哪一句？／意思是？</a>
   </div>
@@ -499,7 +532,8 @@ function viewDialogue(id){
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
   const box = el.querySelector('.srcbox').innerHTML;
-  el.outerHTML = el.classList.contains('srow') ? rowHTML(d, i) : lineHTML(d, i, opts);
+  if(el.classList.contains('drow')){ const tmp = document.createElement('div'); tmp.innerHTML = drillRowHTML(d, i); el.replaceWith(tmp.querySelector('.drow')); }
+  else el.outerHTML = el.classList.contains('srow') ? rowHTML(d, i) : lineHTML(d, i, opts);
   const nel = document.querySelector(`.line[data-key="${key}"]`); nel.querySelector('.srcbox').innerHTML = box;
 }
 function bindPlayer(){
