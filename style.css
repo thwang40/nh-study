@@ -338,3 +338,12 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
   .dscript .drow.first:not(.k-main){margin-top:14px}
   .dscript .drow.first:not(.k-main)::before{top:-8px;left:6px;right:6px}
 }
+
+/* 📖 課本：只顯示這一段（節選） */
+.pm-wrap.secmode{background:#5a514a}
+.pm-wrap .secfig{margin:0 0 12px}
+.pm-wrap .secfig figcaption{color:#f3ece4;font-size:12px;padding:6px 4px 4px;text-align:center}
+.pm-wrap .secfig img{border-radius:4px}
+.pside .pm-wrap.secmode{background:transparent}
+.pside .pm-wrap .secfig figcaption{color:#6b5d50}
+.pm-bar .pmfull{font-size:12px}

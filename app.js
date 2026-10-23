@@ -413,6 +413,7 @@ async function cacheLessonPages(n, a, b){
   if(!('caches' in window)) return toast('此瀏覽器不支援離線');
   const ps = n==='b' ? pageList({pages:[a, b]}) : pageList(LESSON[n]); const c = await caches.open('nh-pages-v1'); let k=0;
   for(const p of ps){ try{ if(!(await c.match(pageSrc(p)))) await c.add(pageSrc(p)); }catch(e){} k++; const el=$('#pgcInfo'); if(el) el.textContent=`${k}/${ps.length}`; }
+  if(n!=='b') for(const [id, es] of Object.entries(window.SEC||{})) if(DLG[id] && DLG[id].l==n) for(const e of es){ try{ const u='pages/sec/'+e[0]; if(!(await c.match(u))) await c.add(u); }catch(err){} }
   const el=$('#pgcInfo'); if(el) el.textContent = n==='b' ? '這一段已存離線 ✓' : '本課頁面已存離線 ✓';
 }
 // ---- 📖 課本 p.xx：各項目對應的課本頁面（覆蓋視窗） ----
@@ -425,7 +426,7 @@ function itemPages(d){
 function pagesLabel(ps){ const run = ps.every((p,i)=>!i || p===ps[i-1]+1); return 'p.' + (ps.length===1 ? ps[0] : run ? `${ps[0]}–${ps[ps.length-1]}` : ps.join('・')); }
 function bookBtnHTML(d){ const ps = itemPages(d); if(!ps.length) return '';
   const lab = ps.length>3 && !ps.every((p,i)=>!i || p===ps[i-1]+1) ? `p.${ps[0]} 等 ${ps.length} 頁` : pagesLabel(ps);
-  return `<button class="btn sm ghost bookbtn" data-act="bookpg" data-d="${d.id}" title="${d.src||d.drill?'打開這一項的課本頁面':'打開這段會話所依據的課本文型頁面'}">📖 課本 ${lab}</button>`; }
+  return `<button class="btn sm ghost bookbtn" data-act="bookpg" data-d="${d.id}" title="${d.src||d.drill?'打開課本上這一段':'打開這段會話所依據的課本文型段落'}">📖 課本 ${lab}</button>`; }
 // 句子編號：文型／同文型頁依課本編號——文型標題句、1)→第1句、2)→第2句…；練習的例句標「練習x 例」，※ 為參考
 function drillNo(ln){
   const t = (ln.tag||'').trim(); let m;
@@ -441,11 +442,17 @@ function lineNo(d, i){ const ln = d.lines[i]; if(d.drill){ const r = drillNo(ln)
 let PM = null;   // 目前開著的課本頁視窗：{el, mode:'side'|'modal', id, ps, i, zoom, go, zoomTo}
 const SIDE_MIN = 1100; // 寬螢幕：在內容右側開側邊視窗；較窄（手機）用全螢幕覆蓋
 function bookTitle(d){ return d.drill ? gLabel(d.drill).replace(/ p\.[\d・–]+$/,'') : d.src ? `第${d.l}課 ${d.src.label}` : `實用會話 ${d.id}（依據的文型頁）`; }
+// 只截取這一項在課本上的那一段（pages/sec/*.webp，見 sec.js）；實用會話＝所依據的各文型段落
+function secList(d){ const S2 = window.SEC || {};
+  if(d.drill || d.src) return S2[d.id] && S2[d.id].length ? S2[d.id] : null;
+  const ks = [...new Set(d.lines.flatMap(l=>l.g||[]))].filter(k=>B.grammar[k]).sort((a,b)=>B.grammar[a].pg-B.grammar[b].pg || (+a.split('-')[1]||0)-(+b.split('-')[1]||0));
+  const kk = ks.filter(k=>S2['g'+k]); if(!kk.length) return null;   // 入門的文型沒有截段 → 只列有截段的；「看整頁」仍有全部頁面
+  const seen = new Set(); return kk.flatMap(k=>S2['g'+k]).filter(e=>!seen.has(e[0]) && seen.add(e[0])); }
 function openBook(d){
   if(PM && PM.mode==='side' && PM.id===d.id){ closePageModal(); return; }   // 再按一次＝收起側邊視窗
-  openPageModal(itemPages(d), bookTitle(d), d.id, innerWidth >= SIDE_MIN ? 'side' : 'modal');
+  openPageModal(itemPages(d), bookTitle(d), d.id, innerWidth >= SIDE_MIN ? 'side' : 'modal', secList(d));
 }
-function openPageModal(ps, title, id, mode){
+function openPageModal(ps, title, id, mode, sec){
   const keepZoom = PM && PM.mode==='side' && mode==='side' ? PM.zoom : 1;
   closePageModal(true);
   const side = mode==='side';
@@ -454,24 +461,40 @@ function openPageModal(ps, title, id, mode){
   el.innerHTML = `<div class="pm-bar"><span class="t">📖 ${esc(title)}</span>
     <button class="btn sm" data-pm="prev" aria-label="上一頁">‹</button><span class="small" id="pmLab"></span><button class="btn sm" data-pm="next" aria-label="下一頁">›</button>
     <div class="seg"><button data-pz="1">符合寬度</button><button data-pz="1.6">1.6×</button><button data-pz="2.4">2.4×</button></div>
+    <button class="btn sm pmfull" data-pm="full" hidden>看整頁</button>
     <button class="btn sm" data-pm="close" aria-label="關閉">✕${side?'':' 關閉'}</button></div>
-    <div class="pm-wrap" id="pmWrap"><img id="pmImg" width="1200" height="1714" alt=""></div>`;
+    <div class="pm-wrap" id="pmWrap"></div>`;
   if(side){ document.querySelector('.layout').appendChild(el); document.body.classList.add('has-pside'); }
   else { document.body.appendChild(el); document.body.style.overflow = 'hidden'; }
-  PM = {el, mode, id, ps, i:0, zoom:keepZoom};
-  const img = el.querySelector('#pmImg'), wrap = el.querySelector('#pmWrap');
-  const show = () => { const p = PM.ps[PM.i]; img.src = pageSrc(p); img.alt = `課本 p.${p}`; img.style.width = (PM.zoom*100)+'%';
-    el.querySelector('#pmLab').textContent = `p.${p}` + (PM.ps.length>1 ? `（${PM.i+1}/${PM.ps.length}）` : '');
-    el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => b.style.visibility = PM.ps.length>1 ? 'visible' : 'hidden');
+  PM = {el, mode, id, ps, i:0, zoom:keepZoom, sec: sec || null, full: !sec};
+  const wrap = el.querySelector('#pmWrap'), fullBtn = el.querySelector('[data-pm="full"]');
+  const show = () => { const secMode = !!(PM.sec && !PM.full), lab = el.querySelector('#pmLab');
+    wrap.classList.toggle('secmode', secMode);
+    if(secMode){
+      if(!wrap.querySelector('.secimg')){ const n = PM.sec.length;
+        wrap.innerHTML = PM.sec.map(([f,w,h,p],j)=>`<figure class="secfig">${n>1?`<figcaption>p.${p}（${j+1}/${n}）</figcaption>`:''}<img class="secimg" src="pages/sec/${f}" width="${w}" height="${h}" alt="課本 p.${p}（這一段）"></figure>`).join(''); }
+      lab.textContent = pagesLabel([...new Set(PM.sec.map(e=>e[3]))].sort((a,b)=>a-b)) + ' 這一段';
+      el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => b.style.display = 'none');
+    } else {
+      let img = wrap.querySelector('#pmImg'); if(!img){ wrap.innerHTML = '<img id="pmImg" width="1200" height="1714" alt="">'; img = wrap.querySelector('#pmImg'); }
+      const p = PM.ps[PM.i]; img.src = pageSrc(p); img.alt = `課本 p.${p}`;
+      lab.textContent = `p.${p}` + (PM.ps.length>1 ? `（${PM.i+1}/${PM.ps.length}）` : '');
+      el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => { b.style.display = ''; b.style.visibility = PM.ps.length>1 ? 'visible' : 'hidden'; });
+      const nx = PM.ps[PM.i+1]; if(nx){ const im = new Image(); im.src = pageSrc(nx); }
+    }
+    wrap.querySelectorAll('img').forEach(im => im.style.width = (PM.zoom*100)+'%');
+    fullBtn.hidden = !PM.sec || !PM.ps.length; fullBtn.textContent = secMode ? '看整頁' : '只看這段';
+    fullBtn.title = secMode ? '打開完整的課本頁面' : '回到只顯示這一段';
     el.querySelectorAll('[data-pz]').forEach(b => b.classList.toggle('on', +b.dataset.pz===PM.zoom)); wrap.scrollTop = 0;
-    document.querySelectorAll('.bookbtn').forEach(b => b.classList.toggle('on', side && b.dataset.d===PM.id));
-    const nx = PM.ps[PM.i+1]; if(nx){ const im = new Image(); im.src = pageSrc(nx); } };
-  PM.go = dir => { const j = PM.i + dir; if(j>=0 && j<PM.ps.length){ PM.i = j; show(); } };
+    document.querySelectorAll('.bookbtn').forEach(b => b.classList.toggle('on', side && b.dataset.d===PM.id)); };
+  PM.go = dir => { if(PM.sec && !PM.full) return; const j = PM.i + dir; if(j>=0 && j<PM.ps.length){ PM.i = j; show(); } };
   PM.zoomTo = z => { PM.zoom = z; show(); };
   PM.show = show;
   el.addEventListener('click', e => { const b = e.target.closest('[data-pm],[data-pz]'); if(!b) return;
-    if(b.dataset.pz) PM.zoomTo(+b.dataset.pz); else if(b.dataset.pm==='close') closePageModal(); else PM.go(b.dataset.pm==='next' ? 1 : -1); });
-  let last = 0; img.addEventListener('click', () => { const t = Date.now(); if(t-last < 350) PM.zoomTo(PM.zoom>1 ? 1 : 2.4); last = t; });
+    if(b.dataset.pz) PM.zoomTo(+b.dataset.pz); else if(b.dataset.pm==='close') closePageModal();
+    else if(b.dataset.pm==='full'){ PM.full = !PM.full; PM.i = 0; show(); }
+    else PM.go(b.dataset.pm==='next' ? 1 : -1); });
+  let last = 0; wrap.addEventListener('click', e => { if(e.target.tagName!=='IMG') return; const t = Date.now(); if(t-last < 350) PM.zoomTo(PM.zoom>1 ? 1 : 2.4); last = t; });
   let sx=0, sy=0, multi=false;
   wrap.addEventListener('touchstart', e => { multi = e.touches.length>1; sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive:true});
   wrap.addEventListener('touchend', e => { if(multi || PM.zoom>1 || (window.visualViewport && visualViewport.scale>1.05)) return;
@@ -492,7 +515,7 @@ function syncBookPanel(){
   const m = location.hash.match(/^#\/(d|g)\/([^/?]+)/), d = m && (m[1]==='g' ? DLG['g'+decodeURIComponent(m[2])] : DLG[decodeURIComponent(m[2])]);
   const ps = d ? itemPages(d) : [];
   if(!ps.length || innerWidth < SIDE_MIN){ closePageModal(true); return; }
-  if(d.id !== PM.id) openPageModal(ps, bookTitle(d), d.id, 'side'); else PM.show();
+  if(d.id !== PM.id) openPageModal(ps, bookTitle(d), d.id, 'side', secList(d)); else PM.show();
 }
 addEventListener('resize', () => { if(PM && PM.mode==='side' && innerWidth < SIDE_MIN) closePageModal(true); });
 window.addEventListener('popstate', () => { if(PM && PM.mode==='modal'){ PM.pushed = false; closePageModal(true); } });
