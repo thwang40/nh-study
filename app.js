@@ -263,7 +263,7 @@ function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Mat
 
 /* ---------------- side nav ---------------- */
 function renderSide(cur){
-  $('#side').innerHTML = `<a href="#/" class="${cur==='home'?'cur':''}">🏠 首頁</a><a href="#/review" class="${cur==='review'?'cur':''}">📝 複習清單（${revCount()}）</a><a href="#/p/b/0" class="${cur==='book'?'cur':''}">📚 整本課本（全部頁面）</a>` +
+  $('#side').innerHTML = searchFormHTML('', 'sside') + `<a href="#/" class="${cur==='home'?'cur':''}">🏠 首頁</a><a href="#/review" class="${cur==='review'?'cur':''}">📝 複習清單（${revCount()}）</a><a href="#/p/b/0" class="${cur==='book'?'cur':''}">📚 整本課本（全部頁面）</a>` +
     B.lessons.map(l => { const p = lessonProgress(l.n); return `<a href="#/l/${l.n}" class="${cur===l.n?'cur':''}">${l.n?`第${l.n}課 `:''}${esc(l.t)}<small>${esc(l.zh)}・${p.done}/${p.total} 完成</small></a>`; }).join('');
 }
 
@@ -274,6 +274,7 @@ function viewHome(){
   $('#view').innerHTML = `
   <h1>文化日本語 第1～12課 聽力練習</h1>
   <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
+  ${searchFormHTML('', 'home')}
   <div class="row" style="margin:8px 0 14px">
     <a class="btn" href="#/l/0" style="text-decoration:none">從入門開始</a><a class="btn ghost" href="#/l/1" style="text-decoration:none">第1課</a>
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${revCount()}）</a>
@@ -1037,6 +1038,81 @@ async function openSettings(){
   $('#closeS').onclick = closeSheet;
 }
 
+/* ---------------- 🔍 搜尋 ----------------
+   全部內容建一個記憶體索引（第一次搜尋時才建，之後重複使用；離線也能用）：入門／本文／文型／實用會話／逐句／場合使用／開口練習的另外說法（rp.js，載得到才加）／單字
+   比對日文、假名讀音、中文；忽略空白與標點、全形半形、片假名＝平假名（かいしゃ 找得到 会社，こーひー 找得到 コーヒー） */
+const SQ_PUNCT = /[\s\u3000、。，,.．!！?？・･「」『』（）()［］\[\]【】〈〉《》〜~…‥:：;；"'“”‘’\/／＊*＋+=＝|｜-]/;
+function sqChar(c){ let n = c.normalize('NFKC').toLowerCase(); n = n.replace(/[ァ-ヶ]/g, x => String.fromCharCode(x.charCodeAt(0) - 0x60)); return [...n].filter(x => !SQ_PUNCT.test(x)).join(''); }
+function sqNorm(s){ let o = ''; for(const c of String(s||'')) o += sqChar(c); return o; }
+// 正規化後的字串＋每個字對應回原字串的位置（用來標出命中的部分）
+function sqMap(s){ const chars = [...String(s||'')], n = [], pos = []; let off = 0;
+  chars.forEach(c => { const t = sqChar(c); for(const x of t){ n.push(x); pos.push([off, off + c.length]); } off += c.length; });
+  return {n: n.join(''), pos}; }
+function sqHi(s, q){ const m = sqMap(s), j = m.n.indexOf(q); if(j < 0 || !q) return esc(s);
+  const qa = [...q].length, nn = [...m.n]; const k = [...m.n.slice(0, j)].length; // char index
+  const a = m.pos[k][0], b = m.pos[Math.min(k + qa, nn.length) - 1][1]; s = String(s);
+  return esc(s.slice(0, a)) + '<mark>' + esc(s.slice(a, b)) + '</mark>' + esc(s.slice(b)); }
+let SIDX = null, SIDX_RP = false;
+function sqItem(o){ o.nj = sqNorm(o.ja); o.nk = sqNorm(o.kana); o.nz = sqNorm(o.zh); return o; }
+function buildIndex(){
+  const I = [];
+  B.dialogues.forEach(d => d.lines.forEach((ln, i) => { if(ln.scene) return;
+    I.push(sqItem({t: d.src ? '本文' : '會話', l: d.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: d.sp[ln.s].name, pg: d.src ? d.src.page : null, src: d.src ? `${d.src.label}` : `實用會話 ${d.id}`, href: '#/d/'+d.id, key: d.id+':'+i})); }));
+  Object.values(SPLITD).forEach(v => v.lines.forEach((ln, k) => I.push(sqItem({t: '逐句', l: v.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: v.sp[ln.s].name, pg: v.src ? v.src.page : null, src: `${v.src.label}・${ln.lab}`, href: '#/d/'+v.split, key: v.id+':'+k}))));
+  Object.values(DRILL).forEach(d => d.lines.forEach((ln, i) => I.push(sqItem({t: d.l ? '文型' : '入門', l: d.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: '', pg: ln.pg, src: gLabel(d.drill).replace(/ p\.[\d・–]+$/, ''), href: '#/g/'+d.drill, key: d.id+':'+i}))));
+  Object.values(SITUD).forEach(v => v.lines.forEach((ln, k) => I.push(sqItem({t: '場合使用', l: v.l, ja: ln.ja, kana: ln.kana, zh: ln.zh, who: v.sp[ln.s].name, pg: v.src.page, src: `依${v.src.label}・情境${ln.si+1}`, href: '#/d/'+v.situ, key: v.id+':'+k}))));
+  const firstUse = {}; B.dialogues.forEach(d => d.lines.forEach((ln, i) => (ln.v||[]).forEach(w => { if(!firstUse[w]) firstUse[w] = [d, i]; })));
+  Object.entries(B.vocab).forEach(([w, v]) => { const f = firstUse[w];
+    I.push(sqItem({t: '單字', l: v.l, ja: w, kana: v.r, zh: v.zh, who: '', pg: null, src: vLabel(w), href: f ? '#/d/'+f[0].id : (LESSON[v.l] ? '#/l/'+v.l : '#/'), key: f ? f[0].id+':'+f[1] : null})); });
+  SIDX = I; return I;
+}
+function addRPIndex(){ if(SIDX_RP || !window.RP || !SIDX) return; SIDX_RP = true;
+  Object.entries(window.RP).forEach(([id, m]) => { const d = DLG[id]; if(!d) return;
+    Object.entries(m).forEach(([i, [cue, alts]]) => { const ln = d.lines[+i]; if(!ln) return;
+      alts.forEach(a => SIDX.push(sqItem({t: '開口練習', l: d.l, ja: a[0], kana: a[1], zh: a[2], who: d.sp[ln.s].name, pg: d.src ? d.src.page : null, src: d.situ ? `場合使用 情境${ln.si+1}・另一種說法` : `${d.src ? d.src.label : '實用會話 '+d.id}・另一種說法`, href: '#/d/'+(d.situ||d.id), key: d.id+':'+i}))); }); }); }
+const SQ_BADGE = {'本文':'txt', '逐句':'txt', '文型':'g', '入門':'g', '會話':'kw', '場合使用':'xt', '開口練習':'xt', '單字':'w'};
+const SQ_LAB = {'場合使用':'場合使用・課外', '開口練習':'開口練習・課外', '會話':'實用會話'};
+function searchFormHTML(q, cls){ return `<form class="sform${cls?' '+cls:''}" role="search" data-sform><input type="search" name="q" value="${esc(q||'')}" placeholder="搜尋日文、假名或中文（例：かいしゃ、咖啡）" aria-label="搜尋" enterkeyhint="search" autocomplete="off"><button class="btn sm" type="submit">🔍 搜尋</button></form>`; }
+function runSearch(q){
+  const nq = sqNorm(q); if(!nq) return [];
+  if(!SIDX) buildIndex(); addRPIndex();
+  return SIDX.filter(o => o.nj.includes(nq) || o.nk.includes(nq) || o.nz.includes(nq));
+}
+function viewSearch(q){
+  renderSide('search'); current = null;
+  const t0 = performance.now(), res = runSearch(q), nq = sqNorm(q), ms = Math.round(performance.now() - t0);
+  const byL = {}; res.forEach(o => (byL[o.l] = byL[o.l] || []).push(o));
+  const MAX = 400; let shown = 0;
+  const item = (o, n) => { const hitJ = o.nj.includes(nq), hitK = !hitJ && o.nk.includes(nq), hitZ = o.nz.includes(nq);
+    return `<a class="sres" href="${o.href}" data-hl="${o.key||''}" data-n="${n}"><div class="srtop"><span class="sbadge ${SQ_BADGE[o.t]}">${SQ_LAB[o.t]||o.t}</span>${o.who?`<b class="swho2">${esc(o.who)}</b>`:''}<span class="small mute">${esc(o.src)}${o.pg?`・p.${o.pg}`:''}</span></div>
+      <div class="ja">${hitJ ? sqHi(o.ja, nq) : esc(o.ja)}</div>${(hitK || S.showKana) && o.kana !== o.ja ? `<div class="kana">${hitK ? sqHi(o.kana, nq) : esc(o.kana)}</div>` : ''}<div class="zh">${hitZ ? sqHi(o.zh, nq) : esc(o.zh)}</div></a>`; };
+  let n = 0;
+  const groups = Object.keys(byL).sort((a, b) => (isNaN(a) ? 99 : +a) - (isNaN(b) ? 99 : +b)).map(l => { const L = LESSON[l]; const list = byL[l];
+    const html = list.map(o => { if(shown >= MAX) return ''; shown++; return item(o, n++); }).join('');
+    return `<section class="sgrp"><h2>${!L ? '補充單字' : +l ? `第${l}課　${esc(L.t)}` : esc(L.t)}<span class="small mute">（${list.length}）</span></h2>${html}</section>`; }).join('');
+  $('#view').innerHTML = `<div class="crumb"><a href="#/">首頁</a> › 搜尋</div>
+    <h1>🔍 搜尋</h1>${searchFormHTML(q)}
+    ${!nq ? `<div class="card small mute">輸入日文（漢字或假名）或中文，按「搜尋」或 Enter。可以找本文、文型例句、實用會話、場合使用（課外）、單字。片假名、平假名都可以，例如「かいしゃ」會找到「会社」、「こーひー」會找到「コーヒー」。</div>`
+      : res.length ? `<div class="small mute scount">「${esc(q)}」共 ${res.length} 筆，分布在 ${Object.keys(byL).length} 課${res.length > MAX ? `（先顯示前 ${MAX} 筆，請再加幾個字縮小範圍）` : ''}　<span style="opacity:.6">${ms} ms</span></div>${groups}`
+      : `<div class="card sempty">找不到「${esc(q)}」。<div class="small mute" style="margin-top:6px">試試看：少打幾個字、改用平假名（例：「かいしゃ」）、或用中文（例：「咖啡」）。</div></div>`}`;
+  const inp = $('#view .sform input'); if(inp && !nq) setTimeout(() => inp.focus(), 50);
+  if(!window.RP && nq) loadRP().then(() => { if(location.hash === '#/s/' + encodeURIComponent(q) && !SIDX_RP){ addRPIndex(); const y = scrollY; viewSearch(q); window.scrollTo(0, y); } }).catch(() => {});
+}
+let pendingHL = null;
+function applyHL(){
+  const k = pendingHL; pendingHL = null; if(!k) return;
+  const [id, i] = k.split(':'); const d = DLG[id]; if(!d) return;
+  let el = document.querySelector(`.line[data-key="${k}"]`) || document.querySelector(`.dline[data-key="${k}"]`); if(!el) return;
+  const dt = el.closest('details'); if(dt && !dt.open) dt.open = true;
+  reveal[k] = 2; if(el.classList.contains('line')){ rerenderLine(d, +i, {}); el = document.querySelector(`.line[data-key="${k}"]`); if(!el) return; }
+  el.scrollIntoView({block:'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200);
+}
+document.addEventListener('submit', e => { const f = e.target.closest('[data-sform]'); if(!f) return; e.preventDefault();
+  const q = f.querySelector('input').value.trim(); const h = '#/s/' + encodeURIComponent(q); f.querySelector('input').blur();
+  if(location.hash === h) route(); else location.hash = h; });
+document.addEventListener('click', e => { const a = e.target.closest('a.sres'); if(!a) return; pendingHL = a.dataset.hl || null;
+  if(location.hash === a.getAttribute('href')){ e.preventDefault(); route(); } });
+
 /* ---------------- router ---------------- */
 function route(){
   stopAll(); closeSheet();
@@ -1049,8 +1125,10 @@ function route(){
   else if(a==='g') viewDrill(b);
   else if(a==='review') viewReview();
   else if(a==='p') viewPage(b==='b' ? 'b' : +b, +(h.split('/')[2]||0));
+  else if(a==='s'){ let q = ''; try{ q = decodeURIComponent(h.slice(2)); }catch(e){ q = h.slice(2); } viewSearch(q); }
   else viewHome();
   updateChips(); window.scrollTo(0,0);
+  if(pendingHL) setTimeout(applyHL, 60);
 }
 window.addEventListener('hashchange', () => { S.listenFirst = true; reveal = {}; route(); syncBookPanel(); });
 /* ---------------- page-view counter (footer) ----------------

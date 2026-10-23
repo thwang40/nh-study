@@ -442,3 +442,29 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .rpme .small{margin-left:8px}
 .situgrp > .situhead .sitbtns{display:inline-flex;gap:6px;margin-left:auto;align-items:center}
 .situgrp > .situhead .sitbtns .rpbtn,.situgrp > .situhead .sitbtns .bshow{margin-left:0}
+
+/* 🔍 搜尋 */
+.sform{display:flex;gap:6px;margin:8px 0 12px}
+.sform input{flex:1 1 auto;min-width:0;font:inherit;font-size:16px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.sform input:focus{outline:2px solid #f1b7bd;border-color:var(--red)}
+.sform .btn{min-height:40px;white-space:nowrap}
+.sform.sside{margin:0 0 10px}
+.sform.sside input{font-size:14px;padding:6px 10px}
+.sform.sside .btn{min-height:34px;padding:6px 10px;font-size:13px}
+.scount{margin:-4px 0 6px}
+.sgrp h2{font-size:16px;margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.sres{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:6px 0}
+.sres:hover{border-color:#e3b0b5;background:#fffafa}
+.sres .srtop{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:2px}
+.sres .ja{font-size:17px;margin-top:2px}.sres .kana{font-size:12px}.sres .zh{font-size:14px;margin-top:2px}
+.sres mark{background:#ffe48a;color:inherit;border-radius:3px;padding:0 1px}
+.sbadge{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;padding:0 8px;border:1px solid}
+.sbadge.txt{background:#fde9eb;color:var(--red);border-color:#f3c2c7}
+.sbadge.g{background:#f6eaf0;color:#8f3b55;border-color:#e2bfcd}
+.sbadge.kw{background:#eef5ee;color:#2f7d32;border-color:#c5e0c6}
+.sbadge.xt{background:#e8f0fa;color:#2a5d93;border-color:#9dbbe0;border-style:dashed}
+.sbadge.w{background:#f3f0e8;color:#6b5a3a;border-color:#ddd2b8}
+.swho2{font-size:13px}
+.sempty{padding:16px}
+.line.flash,.srow.flash,.dline.flash{animation:flashhl 2.2s ease-out}
+@keyframes flashhl{0%,30%{background:#ffe48a;box-shadow:0 0 0 3px #ffd34d}100%{background:transparent;box-shadow:none}}
