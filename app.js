@@ -6,7 +6,11 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}}, safeParse(localStorage.getItem(LS_KEY)));
 function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
-function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} updateChips(); }
+// 聽力優先 is always the default: the 聽力優先／顯示全文 toggle only applies to the page you are on and is never stored.
+// (Older versions saved listenFirst:false in localStorage, which made every page open with the text shown.)
+S.listenFirst = true;
+function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); }
+try{ if(JSON.parse(localStorage.getItem(LS_KEY)||'{}').listenFirst !== undefined) save(); }catch(e){}
 const DLG = {}; B.dialogues.forEach(d => DLG[d.id] = d);
 const LESSON = {}; B.lessons.forEach(l => LESSON[l.n] = l);
 // 同文型聽力練習：每個文型一組例句，當成「虛擬對話」放進 DLG，播放／顯示／測驗／複習共用同一套機制
@@ -67,7 +71,7 @@ function setPlaying(key){
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
-  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${flowName(d)}・第${+i+1}句：${d.lines[+i].ja}` : ''; }
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.drill ? gLabel(d.drill).replace(/「.*」/,'') : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・第${+i+1}句` : ''; } // no Japanese text here: listening first
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -228,7 +232,7 @@ function viewLesson(n){
   <div class="kana">${esc(L.r)}</div><div class="mute">${esc(L.zh)}・${esc(L.topic)}</div>
   ${UNCERTAIN[n]?`<div class="scene">⚠️ 注意：${esc(UNCERTAIN[n])}，其他文型已對照官方資料。</div>`:''}
   <div class="row" style="margin:6px 0"><span class="small mute">課本 p.${L.pages[0]}–${L.pages[1]}</span><a class="btn sm" style="text-decoration:none" href="#/p/${L.n}/0">📄 課本頁面（${L.pages[1]-L.pages[0]+1} 頁）</a></div>
-  ${playerHTML()}
+  ${playerHTML(true)}
   <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
   <div class="small mute" style="margin:0 0 8px">「全部播放」會依下面的順序（課本頁序 → 實用會話）一句一句播完整課。</div>
   ${n===1?`<h2>🌱 生活の言葉（第1課前，p.14–21）</h2><div class="dlist">${FLOW[0].map(fCard).join('')}</div>`:''}
@@ -343,11 +347,11 @@ function lineHTML(d, i, opts={}){
     <div class="srcbox" id="src-${key.replace(':','_')}"></div>
   </div>`;
 }
-function playerHTML(){
+function playerHTML(noMode){
   return `<div class="player"><div class="row">
     <button class="btn" id="playAllBtn">▶ 全部播放</button>
     <div class="seg" role="group" aria-label="速度"><button data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>
-    <div class="seg" role="group" aria-label="模式"><button data-mode="listen" class="${S.listenFirst?'on':''}">聽力優先</button><button data-mode="show" class="${!S.listenFirst?'on':''}">顯示全文</button></div>
+    ${noMode?'':`<div class="seg" role="group" aria-label="模式"><button data-mode="listen" class="${S.listenFirst?'on':''}">聽力優先</button><button data-mode="show" class="${!S.listenFirst?'on':''}">顯示全文</button></div>`}
   </div></div>`;
 }
 let current = null; // {type, d, idxs}
@@ -389,7 +393,7 @@ function bindPlayer(){
     if(finished && c.type==='dlg'){ S.done[c.d.id] = true; save(); toast('這段聽完了 👍 試試看測驗吧'); }
   };
   document.querySelectorAll('.player [data-sp]').forEach(b => b.onclick = () => { S.speed = +b.dataset.sp; save(); document.querySelectorAll('.player [data-sp]').forEach(x=>x.classList.toggle('on', x===b)); });
-  document.querySelectorAll('.player [data-mode]').forEach(b => b.onclick = () => { S.listenFirst = b.dataset.mode==='listen'; save(); route(); });
+  document.querySelectorAll('.player [data-mode]').forEach(b => b.onclick = () => { S.listenFirst = b.dataset.mode==='listen'; const y = scrollY; route(); window.scrollTo(0, y); });
 }
 
 /* review */
@@ -561,7 +565,7 @@ function route(){
   else viewHome();
   updateChips(); window.scrollTo(0,0);
 }
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => { S.listenFirst = true; reveal = {}; route(); });
 route();
 
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
