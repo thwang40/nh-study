@@ -324,3 +324,17 @@ body.has-pside .igrp{--igw:122px}
 .script.has-ill > .srow{max-width:calc(100% - min(33%, 340px) - 18px)}
 body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 18px)}
 @media (max-width:560px){ .script.has-ill > .srow, body.has-pside .script.has-ill > .srow{max-width:none} }
+
+/* 文型 pages: a blank line before each numbered example group (1) 2) 3) …); rows inside a group stay tight */
+.drow.k-main + .sx + .drow:not(.k-main):not(.first){margin-top:6px}
+.drow.k-main + .sx + .drow.k-main{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.drow.k-main:has(+ .sx + .drow.k-main){border-bottom-left-radius:0;border-bottom-right-radius:0}
+.dscript .drow.first:not(.k-main){margin-top:16px}
+.dscript .drow.first:not(.k-main)::before{content:"";position:absolute;left:10px;right:10px;top:-9px;border-top:1px dashed #ecdcae;pointer-events:none}
+.dscript .shead + .drow.first,.dscript .spg + .drow.first{margin-top:4px}
+.dscript .shead + .drow.first::before,.dscript .spg + .drow.first::before{display:none}
+.dscript .shead{margin-top:18px}
+@media (max-width:560px){
+  .dscript .drow.first:not(.k-main){margin-top:14px}
+  .dscript .drow.first:not(.k-main)::before{top:-8px;left:6px;right:6px}
+}
