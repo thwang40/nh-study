@@ -218,7 +218,7 @@ function viewHome(){
     <div class="mute" style="margin-top:4px">第一次開啟後，音檔會自動存到裝置，之後沒網路也能播放（可在 ⚙︎ 設定中檢查）。</div>
   </div>
   <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），同文型聽力練習全部為課本文型例句與練習例（標頁碼）；標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:雀松朱司）。僅供個人學習使用。</div>
-  <div style="text-align:right;margin:10px 0 4px"><a href="https://thwang40.github.io/jimtof-talk/" style="font-size:11px;color:#9aa0a6;text-decoration:none">展會會話 ›</a></div>`;
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:10px 0 4px;font-size:11px;color:#9aa0a6"><span id="viewCount">${viewCountText()}</span><a href="https://thwang40.github.io/jimtof-talk/" style="color:#9aa0a6;text-decoration:none">展會會話 ›</a></div>`;
 }
 
 function viewLesson(n){
@@ -566,7 +566,31 @@ function route(){
   updateChips(); window.scrollTo(0,0);
 }
 window.addEventListener('hashchange', () => { S.listenFirst = true; reveal = {}; route(); });
+/* ---------------- page-view counter (footer) ----------------
+   Abacus (https://abacus.jasoncameron.dev): free, no signup, CORS *. /hit creates the key on first use and returns {value}.
+   Counted once per page load (not per hash route). Daily key uses the Asia/Taipei date. Offline or any error: show nothing. */
+const VC_NS = 'thw40-nhstudy-k7q2vx';
+let VC = null;
+function viewCountText(){ return VC ? `今日瀏覽 ${VC.today.toLocaleString()} 次・總瀏覽 ${VC.total.toLocaleString()} 次` : ''; }
+function taipeiDate(){
+  try{ return new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date()); }
+  catch(e){ return new Date(Date.now() + 8*3600e3).toISOString().slice(0, 10); }
+}
+async function countView(){
+  if(navigator.onLine === false || !window.fetch) return;
+  const hit = async key => {
+    const ac = window.AbortController ? new AbortController() : null; const t = setTimeout(() => ac && ac.abort(), 6000);
+    try{ const r = await fetch(`https://abacus.jasoncameron.dev/hit/${VC_NS}/${key}`, {cache:'no-store', signal: ac && ac.signal});
+      if(!r.ok) throw 0; const j = await r.json(); if(typeof j.value !== 'number') throw 0; return j.value; }
+    finally{ clearTimeout(t); }
+  };
+  try{
+    const [total, today] = await Promise.all([hit('views-total'), hit('views-' + taipeiDate())]);
+    VC = {total, today}; const el = document.getElementById('viewCount'); if(el) el.textContent = viewCountText();
+  }catch(e){ VC = null; }
+}
 route();
+setTimeout(countView, 1500); // after first render; never blocks the app
 
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
