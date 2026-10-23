@@ -298,3 +298,16 @@ body.has-pside .igimg .illb img{max-width:108px;max-height:96px}
   .dlist .gcard{margin-left:18px}
   .dlist .gcard::before{left:-13px;width:9px}
 }
+
+/* 出處 panel as its own full-width block after the row (not squeezed into the text column) */
+.srcbox:empty{display:none}
+.srcbox.sx{margin:0 6px 8px 36px}
+.script > .srcbox.sx{clear:right}
+.igrp{--igw:160px}
+body.has-pside .igrp{--igw:122px}
+.igrows > .srcbox.sx.wide{margin-right:calc(6px - var(--igw))}
+.sx:empty + .srow{margin-top:2px}
+@media (max-width:560px){
+  .srcbox.sx{margin:0 2px 8px 6px}
+  .igrows > .srcbox.sx.wide{margin-right:2px}
+}

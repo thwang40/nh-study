@@ -189,15 +189,27 @@ function srcPanelHTML(d, i){
   return `<div class="srcwrap"><button class="srcx top" data-act="srcclose" data-k="${k}" aria-label="收起出處">收起 ▲</button>${srcHTML(d, i)}<button class="srcx bot" data-act="srcclose" data-k="${k}" aria-label="收起出處">收起 ▲</button></div>`;
 }
 function setIdk(el, open){ if(!el) return; el.classList.toggle('srcopen', open); el.querySelectorAll('[data-act="idk"]').forEach(x=>{ x.setAttribute('aria-expanded', open?'true':'false'); x.classList.toggle('on', open); x.title = open ? '收起出處' : '我不會'; }); }
+function lineEl(k){ return document.querySelector(`.line[data-key="${k}"]`); }
+/* panel next to per-sentence pictures: widen it under the picture column once it starts below the picture */
+function fitSrc(){
+  document.querySelectorAll('.igrows > .srcbox').forEach(sb => {
+    sb.classList.remove('wide'); if(!sb.innerHTML.trim()) return;
+    const g = sb.closest('.igrp'); if(!g || getComputedStyle(g).display!=='grid') return;
+    const imgs = g.querySelectorAll('.igimg img'); let bottom = 0; imgs.forEach(im => bottom = Math.max(bottom, im.getBoundingClientRect().bottom));
+    if(!imgs.length || sb.getBoundingClientRect().top >= bottom + 4) sb.classList.add('wide');
+  });
+}
+window.addEventListener('resize', () => { clearTimeout(fitSrc._t); fitSrc._t = setTimeout(fitSrc, 150); });
 function openSrc(d, i){
   const k = d.id+':'+i, sb = document.getElementById('src-'+k.replace(':','_')); if(!sb) return;
   sb.innerHTML = srcPanelHTML(d, i);
+  fitSrc();
   const w = sb.querySelector('.srcwrap'); if(w && w.offsetHeight > 260) w.classList.add('long');
-  setIdk(sb.closest('.line'), true);
+  setIdk(lineEl(k), true);
 }
 function closeSrc(k, fromBottom){
   const sb = document.getElementById('src-'+k.replace(':','_')); if(!sb) return;
-  const el = sb.closest('.line'); sb.innerHTML = ''; setIdk(el, false);
+  const el = lineEl(k); sb.innerHTML = ''; setIdk(el, false); fitSrc();
   if(fromBottom && el){ const r = el.getBoundingClientRect(); if(r.top < 60) window.scrollBy(0, r.top - 80); }
 }
 function addReview(d, i, why){
@@ -304,8 +316,7 @@ function drillRowHTML(d, i, P){
   return pre + `<div class="line srow drow k-${r.kind}${r.left?' first':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}<div class="snum">${esc(r.left)}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
     <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
-    <div class="srcbox" id="src-${key.replace(':','_')}"></div>
-  </div>`;
+  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function viewDrill(k){
   const d = DRILL[k]; if(!d) return viewHome();
@@ -529,8 +540,7 @@ function rowHTML(d, i){
   return `<div class="line srow${ln.scene?' sscene':''}${narr?' snarr':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key, ln.scene)}${name}
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
     <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button>${ln.scene?'':`<button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button>`}<button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
-    <div class="srcbox" id="src-${key.replace(':','_')}"></div>
-  </div>`;
+  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function illList(d){ return (window.ILL||{})[d.id] || []; }
 function illThumb(d, e, j, cls){ const [f,w,h,p] = e; return `<button class="illb${cls||''}" data-act="ill" data-d="${d.id}" data-j="${j}" aria-label="放大插圖（p.${p}）" title="p.${p}"><img src="pages/ill2/${f}" width="${w}" height="${h}" alt="課本插圖 p.${p}" decoding="async"></button>`; }
@@ -581,12 +591,20 @@ function viewDialogue(id){
 }
 function rerenderLine(d, i, opts){
   const key = d.id+':'+i; const el = document.querySelector(`.line[data-key="${key}"]`); if(!el) return;
-  const box = el.querySelector('.srcbox').innerHTML;
-  if(el.classList.contains('drow')){ const tmp = document.createElement('div'); tmp.innerHTML = drillRowHTML(d, i); el.replaceWith(tmp.querySelector('.drow')); }
-  else el.outerHTML = el.classList.contains('srow') ? rowHTML(d, i) : lineHTML(d, i, opts);
+  const sb = document.getElementById('src-'+key.replace(':','_'));
+  const box = sb ? sb.innerHTML : '';
+  const hiddenAgain = S.listenFirst && !(reveal[key]||0);
+  if(el.classList.contains('srow')){   // 本文／文型／實用會話: panel is a sibling of the row, keep it
+    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : rowHTML(d, i);
+    el.replaceWith(tmp.querySelector('.srow'));
+    if(box && hiddenAgain){ closeSrc(key); return; }
+    if(box) setIdk(document.querySelector(`.line[data-key="${key}"]`), true);
+    return;
+  }
+  el.outerHTML = lineHTML(d, i, opts);
   const nel = document.querySelector(`.line[data-key="${key}"]`);
   // hidden again (tap cycle back to 0) → its info panel closes too
-  if(box && !(S.listenFirst && !(reveal[key]||0))){ nel.querySelector('.srcbox').innerHTML = box; setIdk(nel, true); }
+  if(box && !hiddenAgain){ nel.querySelector('.srcbox').innerHTML = box; setIdk(nel, true); }
 }
 function bindPlayer(){
   const pb = $('#playAllBtn');
