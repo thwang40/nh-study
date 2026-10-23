@@ -262,3 +262,19 @@ body.has-pside .igimg .illb img{max-width:108px;max-height:96px}
   .igimg{flex-direction:row;justify-content:flex-start;padding:4px 8px 0;align-items:flex-start}
   .igimg .illb img,body.has-pside .igimg .illb img,.igimg.two .illb img{max-height:100px;max-width:44vw}
 }
+
+/* 還不熟悉 checkbox */
+.srow{position:relative}
+.srow:not(.sscene){padding-left:36px}
+.ufam{position:absolute;left:2px;top:1px;width:32px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent}
+.ufam:hover{background:rgba(217,130,43,.10)}
+.ufam input{width:17px;height:17px;margin:0;cursor:pointer;accent-color:#d9822b}
+.srow.unf:not(.playing){background:rgba(240,170,60,.16);box-shadow:inset 3px 0 0 #e6a23c}
+.line.unf:not(.srow){border-color:#efc16f;background:#fffaf0}
+.lhead .ufam{position:static;width:30px;height:30px;margin:-4px -2px -4px -6px;flex:0 0 auto}
+.revh{font-size:17px;margin:18px 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+@media (max-width:560px){
+  .srow:not(.sscene){padding-left:34px}
+  .ufam{left:0;top:0;width:34px;height:36px}
+  .ufam input{width:19px;height:19px}
+}
