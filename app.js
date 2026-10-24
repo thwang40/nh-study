@@ -351,6 +351,27 @@ function drillParse(d){
 function blkOf(d, i){ const L = d.drill && (window.BLK||{})[d.drill]; if(!L) return null; const e = L.find(x => x[0]===i); return e ? e[1] : null; }
 function openBlk(d, i){ const fs = blkOf(d, i); if(!fs) return; const no = lineNo(d, i);
   openPageModal([...new Set(fs.map(e=>e[3]))], bookTitle(d) + '・' + (no ? no.lab.replace(/^文型標題句.*/,'文型') : ''), d.id+':'+i, innerWidth >= SIDE_MIN ? 'side' : 'modal', fs); }
+// 手機／窄螢幕：📖 不開全螢幕，直接在這個例句區塊下面展開截圖（再按一次收起）；寬螢幕仍用右側邊視窗
+function toggleBlkInline(d, i){
+  const key = d.id+':'+i, open = document.querySelector(`.blkinl[data-for="${key}"]`);
+  const btn = document.querySelector(`.blkbtn[data-d="${d.id}"][data-i="${i}"]`);
+  if(open){ open.remove(); if(btn){ btn.classList.remove('on'); btn.setAttribute('aria-expanded','false'); } return; }
+  const fs = blkOf(d, i); if(!fs) return;
+  const starts = ((window.BLK||{})[d.drill]||[]).map(x=>x[0]).sort((a,b)=>a-b), nx = starts.find(x=>x>i);
+  const last = (nx==null ? d.lines.length : nx) - 1;   // 這個區塊最後一句
+  let anchor = document.querySelector(`.line[data-key="${d.id}:${last}"]`) || document.querySelector(`.line[data-key="${key}"]`); if(!anchor) return;
+  const sb = anchor.nextElementSibling; if(sb && sb.classList.contains('srcbox')) anchor = sb;
+  while(anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('blkinl')) anchor = anchor.nextElementSibling;
+  const el = document.createElement('div'); el.className = 'blkinl'; el.dataset.for = key;
+  const pgs = [...new Set(fs.map(e=>e[3]))].sort((a,b)=>a-b);
+  el.innerHTML = `<div class="blkinl-bar"><span>📖 課本 ${pagesLabel(pgs)}・這一句</span><span class="small mute">點圖放大</span><button class="blkinl-x" data-act="blkpg" data-d="${d.id}" data-i="${i}" aria-label="收起課本截圖">收起 ✕</button></div>`
+    + fs.map(([f,w,h,p]) => `<div class="blkinl-wrap"><img src="pages/${f}" width="${w}" height="${h}" alt="課本 p.${p}（這一句）" style="max-width:${Math.round(w*1.2)}px" decoding="async"></div>`).join('');
+  el.addEventListener('click', e => { const im = e.target.closest('.blkinl-wrap img'); if(!im) return; const z = !im.classList.contains('z'); im.classList.toggle('z', z); im.style.maxWidth = z ? 'none' : Math.round(+im.getAttribute('width')*1.2)+'px'; });
+  el.querySelectorAll('img').forEach(im => im.addEventListener('error', () => { if(!im.parentNode.querySelector('.imgoff')) im.insertAdjacentHTML('afterend', '<div class="imgoff small">📴 離線時尚未下載這張課本截圖，連上網路後再試，或到 ⚙️ 下載全部離線資料。</div>'); im.remove(); }, {once:true}));
+  anchor.after(el);
+  if(btn){ btn.classList.add('on'); btn.setAttribute('aria-expanded','true'); }
+  const r = el.getBoundingClientRect(); if(r.bottom > innerHeight) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
 function drillRowHTML(d, i, P){
   const ln = d.lines[i], key = d.id+':'+i, r = (P || drillParse(d))[i];
   const lv = (reveal[key]||0);
@@ -360,7 +381,7 @@ function drillRowHTML(d, i, P){
   const pre = (r.pg ? `<div class="spg">p.${r.pg}</div>` : '') + (r.head ? `<div class="shead">${esc(r.head)}</div>` : '');
   return pre + `<div class="line srow drow k-${r.kind}${r.left?' first':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}<div class="snum">${esc(r.left)}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${blkOf(d, i) ? `<button class="ibtn s blkbtn" data-act="blkpg" data-d="${d.id}" data-i="${i}" aria-label="看課本上這一句（截圖）" title="課本上這一句">📖</button>` : ''}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${blkOf(d, i) ? `<button class="ibtn s blkbtn${document.querySelector(`.blkinl[data-for="${key}"]`)?' on':''}" aria-expanded="${!!document.querySelector(`.blkinl[data-for="${key}"]`)}" data-act="blkpg" data-d="${d.id}" data-i="${i}" aria-label="看課本上這一句（截圖）" title="課本上這一句">📖</button>` : ''}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function viewDrill(k){
@@ -1003,7 +1024,7 @@ document.addEventListener('click', e => {
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
   else if(act==='ill'){ openIll(b.dataset.d, +b.dataset.j); }
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
-  else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
+  else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(innerWidth < SIDE_MIN || b.classList.contains('blkinl-x')) toggleBlkInline(d, +b.dataset.i); else if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
