@@ -11,6 +11,8 @@ function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
 S.listenFirst = true;
 function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); }
 try{ if(JSON.parse(localStorage.getItem(LS_KEY)||'{}').listenFirst !== undefined) save(); }catch(e){}
+// v3.1: default speed is 1x; reset once anyone who was left on the old 0.7x setting.
+if(S.spd1 !== 1){ S.speed = 1; S.spd1 = 1; try{ save(); }catch(e){} }
 // 本文改為「一張卡片＝課本一個說話輪次」(turns v1)：複習清單裡舊的逐句編號換成新卡片編號
 if(!S.turns){ try{ const R = {}; Object.entries(S.review).forEach(([k, v]) => { const [id, i] = k.split(':'); const d = B.dialogues.find(x => x.id===id);
     const nk = d && d.remap ? `${id}:${d.remap[+i]}` : k; if(d && d.remap && d.remap[+i]==null) return;
@@ -1085,7 +1087,7 @@ async function openSettings(){
     <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 100 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 3.0（撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 3.1（預設 1x 速度・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
