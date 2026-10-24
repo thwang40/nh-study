@@ -347,6 +347,10 @@ function drillParse(d){
   }).map((r, _, all) => { if(!all.whoIdx){ all.whoIdx = {}; all.forEach(x => { if(x.who && !(x.who in all.whoIdx)) all.whoIdx[x.who] = Object.keys(all.whoIdx).length; }); }
     r.color = r.who ? SPK_COLORS[all.whoIdx[r.who] % SPK_COLORS.length] : ''; return r; });
 }
+// 📖 每個例句區塊（文型句、1) 2) 3)…、※、練習）第一句右邊的課本截圖按鈕（blk.js）
+function blkOf(d, i){ const L = d.drill && (window.BLK||{})[d.drill]; if(!L) return null; const e = L.find(x => x[0]===i); return e ? e[1] : null; }
+function openBlk(d, i){ const fs = blkOf(d, i); if(!fs) return; const no = lineNo(d, i);
+  openPageModal([...new Set(fs.map(e=>e[3]))], bookTitle(d) + '・' + (no ? no.lab.replace(/^文型標題句.*/,'文型') : ''), d.id+':'+i, innerWidth >= SIDE_MIN ? 'side' : 'modal', fs); }
 function drillRowHTML(d, i, P){
   const ln = d.lines[i], key = d.id+':'+i, r = (P || drillParse(d))[i];
   const lv = (reveal[key]||0);
@@ -356,7 +360,7 @@ function drillRowHTML(d, i, P){
   const pre = (r.pg ? `<div class="spg">p.${r.pg}</div>` : '') + (r.head ? `<div class="shead">${esc(r.head)}</div>` : '');
   return pre + `<div class="line srow drow k-${r.kind}${r.left?' first':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}<div class="snum">${esc(r.left)}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${blkOf(d, i) ? `<button class="ibtn s blkbtn" data-act="blkpg" data-d="${d.id}" data-i="${i}" aria-label="看課本上這一句（截圖）" title="課本上這一句">📖</button>` : ''}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function viewDrill(k){
@@ -367,11 +371,11 @@ function viewDrill(k){
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › ${n?'同文型練習':esc(g.p)}</div>
   <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
-  <div class="hrow"><h1>🎧 ${gPatHTML(k, gLabel(k))}</h1>${bookBtnHTML(d)}</div>
+  <div class="hrow"><h1>🎧 ${gPatHTML(k, gLabel(k))}</h1>${bookBtnHTML(d, !!(window.BLK||{})[k])}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
   ${playerHTML()}
   <div class="script dscript" id="lines" data-blk><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span>${blkBtn(false)}</div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
-  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
+  <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）${(window.BLK||{})[k]?'　📖 課本上這一句（截圖）':''}</div>
   <div class="row" style="margin-top:14px">
     <a class="btn" style="text-decoration:none" href="#/q/${d.id}">✏️ 小測驗：聽到的是哪一句？／意思是？</a>
   </div>
@@ -455,6 +459,7 @@ async function cacheLessonPages(n, a, b){
   const ps = n==='b' ? pageList({pages:[a, b]}) : pageList(LESSON[n]); const c = await caches.open('nh-pages-v1'); let k=0;
   for(const p of ps){ try{ if(!(await c.match(pageSrc(p)))) await c.add(pageSrc(p)); }catch(e){} k++; const el=$('#pgcInfo'); if(el) el.textContent=`${k}/${ps.length}`; }
   if(n!=='b') for(const [id, es] of Object.entries(window.SEC||{})) if(DLG[id] && DLG[id].l==n) for(const e of es){ try{ const u='pages/sec/'+e[0]; if(!(await c.match(u))) await c.add(u); }catch(err){} }
+  if(n!=='b') for(const [k, bs] of Object.entries(window.BLK||{})) if(DRILL[k] && DRILL[k].l==n) for(const b of bs) for(const e of b[1]){ try{ const u='pages/'+e[0]; if(!(await c.match(u))) await c.add(u); }catch(err){} }
   const el=$('#pgcInfo'); if(el) el.textContent = n==='b' ? '這一段已存離線 ✓' : '本課頁面已存離線 ✓';
 }
 // ---- 📖 課本 p.xx：各項目對應的課本頁面（覆蓋視窗） ----
@@ -465,7 +470,8 @@ function itemPages(d){
   return [...new Set(d.lines.flatMap(l=>l.g||[]).map(k=>B.grammar[k] && B.grammar[k].pg).filter(Boolean))].sort((a,b)=>a-b); // 實用會話：所依據的文型頁
 }
 function pagesLabel(ps){ const run = ps.every((p,i)=>!i || p===ps[i-1]+1); return 'p.' + (ps.length===1 ? ps[0] : run ? `${ps[0]}–${ps[ps.length-1]}` : ps.join('・')); }
-function bookBtnHTML(d){ const ps = itemPages(d); if(!ps.length) return '';
+function bookBtnHTML(d, mini){ const ps = itemPages(d); if(!ps.length) return '';
+  if(mini) return `<button class="bookbtn mini" data-act="bookpg" data-d="${d.id}" title="打開整頁課本（每一句右邊的 📖 只顯示那一句）">📄 整頁 ${pagesLabel(ps)}</button>`;
   const lab = ps.length>3 && !ps.every((p,i)=>!i || p===ps[i-1]+1) ? `p.${ps[0]} 等 ${ps.length} 頁` : pagesLabel(ps);
   return `<button class="btn sm ghost bookbtn" data-act="bookpg" data-d="${d.id}" title="${d.src||d.drill?'打開課本上這一段':'打開這段會話所依據的課本文型段落'}">📖 課本 ${lab}</button>`; }
 // 句子編號：文型／同文型頁依課本編號——文型標題句、1)→第1句、2)→第2句…；練習的例句標「練習x 例」，※ 為參考
@@ -513,8 +519,8 @@ function openPageModal(ps, title, id, mode, sec){
     wrap.classList.toggle('secmode', secMode);
     if(secMode){
       if(!wrap.querySelector('.secimg')){ const n = PM.sec.length;
-        wrap.innerHTML = PM.sec.map(([f,w,h,p],j)=>`<figure class="secfig">${n>1?`<figcaption>p.${p}（${j+1}/${n}）</figcaption>`:''}<img class="secimg" src="pages/sec/${f}" width="${w}" height="${h}" alt="課本 p.${p}（這一段）"></figure>`).join(''); }
-      lab.textContent = pagesLabel([...new Set(PM.sec.map(e=>e[3]))].sort((a,b)=>a-b)) + ' 這一段';
+        wrap.innerHTML = PM.sec.map(([f,w,h,p],j)=>`<figure class="secfig">${n>1?`<figcaption>p.${p}（${j+1}/${n}）</figcaption>`:''}<img class="secimg" src="${f.includes('/') ? 'pages/'+f : 'pages/sec/'+f}" width="${w}" height="${h}" alt="課本 p.${p}（這一段）"></figure>`).join(''); }
+      lab.textContent = pagesLabel([...new Set(PM.sec.map(e=>e[3]))].sort((a,b)=>a-b)) + (PM.sec.some(e=>e[0].startsWith('blk/')) ? ' 這一句' : ' 這一段');
       el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => b.style.display = 'none');
     } else {
       let img = wrap.querySelector('#pmImg'); if(!img){ wrap.innerHTML = '<img id="pmImg" width="1200" height="1714" alt="">'; img = wrap.querySelector('#pmImg'); }
@@ -523,11 +529,12 @@ function openPageModal(ps, title, id, mode, sec){
       el.querySelectorAll('[data-pm="prev"],[data-pm="next"]').forEach(b => { b.style.display = ''; b.style.visibility = PM.ps.length>1 ? 'visible' : 'hidden'; });
       const nx = PM.ps[PM.i+1]; if(nx){ const im = new Image(); im.src = pageSrc(nx); }
     }
-    wrap.querySelectorAll('img').forEach(im => im.style.width = (PM.zoom*100)+'%');
+    wrap.querySelectorAll('img').forEach(im => { im.style.width = (PM.zoom*100)+'%'; if(/\/blk\//.test(im.getAttribute('src')||'')) im.style.maxWidth = Math.round((+im.getAttribute('width'))*1.2*PM.zoom)+'px'; });
     fullBtn.hidden = !PM.sec || !PM.ps.length; fullBtn.textContent = secMode ? '看整頁' : '只看這段';
     fullBtn.title = secMode ? '打開完整的課本頁面' : '回到只顯示這一段';
     el.querySelectorAll('[data-pz]').forEach(b => b.classList.toggle('on', +b.dataset.pz===PM.zoom)); wrap.scrollTop = 0;
-    document.querySelectorAll('.bookbtn').forEach(b => b.classList.toggle('on', side && b.dataset.d===PM.id)); };
+    document.querySelectorAll('.bookbtn').forEach(b => b.classList.toggle('on', side && b.dataset.d===PM.id));
+    document.querySelectorAll('.blkbtn').forEach(b => b.classList.toggle('on', side && b.dataset.d+':'+b.dataset.i===PM.id)); };
   PM.go = dir => { if(PM.sec && !PM.full) return; const j = PM.i + dir; if(j>=0 && j<PM.ps.length){ PM.i = j; show(); } };
   PM.zoomTo = z => { PM.zoom = z; show(); };
   PM.show = show;
@@ -546,7 +553,7 @@ function openPageModal(ps, title, id, mode, sec){
 function closePageModal(silent){
   if(!PM) return; const pm = PM; PM = null;
   pm.el.remove();
-  if(pm.mode==='side'){ document.body.classList.remove('has-pside'); document.querySelectorAll('.bookbtn.on').forEach(b => b.classList.remove('on')); }
+  if(pm.mode==='side'){ document.body.classList.remove('has-pside'); document.querySelectorAll('.bookbtn.on,.blkbtn.on').forEach(b => b.classList.remove('on')); }
   else document.body.style.overflow = '';
   if(!silent && pm.pushed && history.state && history.state.pm) history.back();
 }
@@ -556,7 +563,7 @@ function syncBookPanel(){
   const m = location.hash.match(/^#\/(d|g)\/([^/?]+)/), d = m && (m[1]==='g' ? DLG['g'+decodeURIComponent(m[2])] : DLG[decodeURIComponent(m[2])]);
   const ps = d ? itemPages(d) : [];
   if(!ps.length || innerWidth < SIDE_MIN){ closePageModal(true); return; }
-  if(d.id !== PM.id) openPageModal(ps, bookTitle(d), d.id, 'side', secList(d)); else PM.show();
+  if(d.id !== String(PM.id).split(':')[0]) openPageModal(ps, bookTitle(d), d.id, 'side', secList(d)); else PM.show();
 }
 addEventListener('resize', () => { if(PM && PM.mode==='side' && innerWidth < SIDE_MIN) closePageModal(true); });
 window.addEventListener('popstate', () => { if(PM && PM.mode==='modal'){ PM.pushed = false; closePageModal(true); } });
@@ -996,6 +1003,7 @@ document.addEventListener('click', e => {
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
   else if(act==='ill'){ openIll(b.dataset.d, +b.dataset.j); }
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
+  else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
@@ -1027,7 +1035,8 @@ async function audioList(){
 // 課本圖片：整頁 pages/pNNN.webp（272 頁）＋各段截圖 pages/sec/*.webp（插圖 pages/ill2 跟著 App 外殼一起存）
 const PAGES_CACHE = 'nh-pages-v1';   // 與 sw.js 的 PAGES 相同
 function imageList(){ const L = []; for(let p = BOOKL.pages[0]; p <= BOOKL.pages[1]; p++) L.push(pageSrc(p));
-  Object.values(window.SEC || {}).forEach(es => es.forEach(e => L.push('pages/sec/' + e[0]))); return [...new Set(L)]; }
+  Object.values(window.SEC || {}).forEach(es => es.forEach(e => L.push('pages/sec/' + e[0])));
+  Object.values(window.BLK || {}).forEach(bs => bs.forEach(b => b[1].forEach(e => L.push('pages/' + e[0])))); return [...new Set(L)]; }
 const relKey = (u, re) => { try{ const m = new URL(u, location.href).pathname.match(re); return m ? m[1] : null; }catch(e){ return null; } };
 const OFF = {
   audio: {name: AUDIO_CACHE, list: audioList, re: /\/(audio\/[^/]+\.mp3)$/, old: /^nh-audio-/},
@@ -1084,10 +1093,10 @@ async function openSettings(){
     <div><b>語音來源</b><div class="seg" style="margin-top:6px"><button data-eng="mp3" class="${S.engine==='mp3'?'on':''}">預錄 MP3（建議）</button><button data-eng="tts" class="${S.engine==='tts'?'on':''}">裝置語音</button></div>
       <div class="small mute">MP3 為 AI 合成的日語語音（VOICEVOX，依標準重音調整），離線可播。裝置語音使用手機/電腦內建 ja-JP 語音${jaVoice?`（目前：${esc(jaVoice.name)}）`:'（尚未偵測到日語語音）'}。</div></div>
     <div><b>顯示假名讀音</b><div class="seg" style="margin-top:6px"><button data-kana="1" class="${S.showKana?'on':''}">顯示</button><button data-kana="0" class="${!S.showKana?'on':''}">隱藏</button></div></div>
-    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 100 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
+    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 110 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 3.1（預設 1x 速度・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 3.2（文型每一句右邊 📖 看課本截圖・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
