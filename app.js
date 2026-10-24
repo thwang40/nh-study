@@ -1012,32 +1012,86 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('keydown', e => { if((e.key==='Enter' || e.key===' ') && e.target.matches && e.target.matches('[role="button"][data-act]')){ e.preventDefault(); e.target.click(); } });
 function closeSheet(){ $('#sheet').classList.add('hidden'); }
+// 離線音檔：清單 = App 實際用到的全部音檔（本文、逐句、文型、實用會話、場合使用、開口練習另外說法、單字；各有 1.0x 與 0.8x）
+const AUDIO_CACHE = 'nh-audio-v9';   // 與 sw.js 的 AUDIO 相同
+async function audioList(){
+  try{ await loadRP(); }catch(e){}
+  const L = [], add = b => L.push(b + '.mp3', b + '_s.mp3');
+  B.dialogues.concat(Object.values(SPLITD), Object.values(DRILL), Object.values(SITUD)).forEach(d => d.lines.forEach((_, i) => add(`audio/${d.id}_${i}`)));
+  Object.keys(B.vocab).forEach((_, n) => add(`audio/w_${n}`));
+  Object.entries(window.RP || {}).forEach(([did, m]) => Object.entries(m).forEach(([i, v]) => v[1].forEach((_, a) => add(`audio/${did}-r_${i}_${a}`))));
+  return [...new Set(L)];
+}
+// 課本圖片：整頁 pages/pNNN.webp（272 頁）＋各段截圖 pages/sec/*.webp（插圖 pages/ill2 跟著 App 外殼一起存）
+const PAGES_CACHE = 'nh-pages-v1';   // 與 sw.js 的 PAGES 相同
+function imageList(){ const L = []; for(let p = BOOKL.pages[0]; p <= BOOKL.pages[1]; p++) L.push(pageSrc(p));
+  Object.values(window.SEC || {}).forEach(es => es.forEach(e => L.push('pages/sec/' + e[0]))); return [...new Set(L)]; }
+const relKey = (u, re) => { try{ const m = new URL(u, location.href).pathname.match(re); return m ? m[1] : null; }catch(e){ return null; } };
+const OFF = {
+  audio: {name: AUDIO_CACHE, list: audioList, re: /\/(audio\/[^/]+\.mp3)$/, old: /^nh-audio-/},
+  img:   {name: PAGES_CACHE, list: async () => imageList(), re: /\/(pages\/(?:p\d+|sec\/[^/]+)\.webp)$/, old: /^nh-pages-/},
+};
+// 只算清單內的；prune 時順便清掉舊版快取、清單外的舊檔、重複的（不同網址寫法）
+async function offScan(kind, prune){
+  const o = OFF[kind], list = await o.list(), want = new Set(list), have = new Set(); let bytes = 0;
+  if(prune) for(const k of await caches.keys()) if(o.old.test(k) && k !== o.name) await caches.delete(k);
+  const c = await caches.open(o.name);
+  for(const req of await c.keys()){
+    const key = relKey(req.url, o.re);
+    if(!key || !want.has(key) || have.has(key)){ if(prune) await c.delete(req); continue; }
+    have.add(key);
+    if(prune){ const r = await c.match(req); const n = r && +r.headers.get('content-length'); if(n) bytes += n; }
+  }
+  return {list, have, bytes};
+}
+const MB = n => (n / 1048576).toFixed(n >= 104857600 ? 0 : 1) + ' MB';
+const offLine = (lab, r) => `${r.have.size >= r.list.length ? '✓ ' : ''}${lab}：${r.have.size} / ${r.list.length}${r.bytes ? `（${MB(r.bytes)}）` : ''}`;
 async function cacheStatus(){
   if(!('caches' in window)) return '此瀏覽器不支援離線快取';
-  try{ const ks = await caches.keys(); let n=0; for(const k of ks){ const c = await caches.open(k); const r = await c.keys(); n += r.filter(x=>/\.mp3$/.test(x.url)).length; } return `已離線儲存音檔：${n} / ${B.dialogues.concat(Object.values(DRILL), Object.values(SPLITD), Object.values(SITUD)).reduce((a,d)=>a+d.lines.length*2,0)}`; }catch(e){ return '無法讀取快取狀態'; }
+  try{ const a = await offScan('audio', true), g = await offScan('img', true);
+    return `${offLine('🔊 音檔', a)}<br>${offLine('📖 課本圖片', g)}`; }
+  catch(e){ return '無法讀取快取狀態'; }
 }
+async function downloadAllOffline(btn, info){
+  if(!('caches' in window)) return toast('此瀏覽器不支援離線');
+  btn.disabled = true; info.textContent = '準備中…';
+  try{ if(navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
+  const R = {audio: await offScan('audio', true), img: await offScan('img', true)}, st = {};
+  const show = () => { info.innerHTML = Object.entries({audio: '🔊 音檔', img: '📖 課本圖片'}).map(([k, lab]) => { const r = R[k], x = st[k] || {done: 0, fail: 0};
+    return `${lab}：${r.have.size + x.done} / ${r.list.length}${x.miss ? `（下載中，剩 ${x.miss - x.done - x.fail}${x.fail ? `，失敗 ${x.fail}` : ''}）` : ''}`; }).join('<br>'); };
+  let fail = 0;
+  for(const k of ['img', 'audio']){
+    const miss = R[k].list.filter(u => !R[k].have.has(u)), c = await caches.open(OFF[k].name); let i = 0;
+    st[k] = {miss: miss.length, done: 0, fail: 0}; show();
+    const worker = async () => { while(i < miss.length){ const u = miss[i++];
+      try{ const r = await fetch(u, {cache: 'no-cache'}); if(r.ok && r.status === 200){ await c.put(u, r); st[k].done++; } else st[k].fail++; }catch(e){ st[k].fail++; }
+      if((st[k].done + st[k].fail) % 10 === 0) show(); } };
+    await Promise.all(Array.from({length: 6}, worker)); fail += st[k].fail;
+  }
+  info.innerHTML = await cacheStatus();
+  btn.disabled = false; btn.textContent = fail ? `⬇︎ 再試一次（${fail} 個失敗）` : '✓ 下載完成，離線也能用';
+}
+// 離線時還沒存的課本圖片：顯示說明文字，不顯示破圖
+document.addEventListener('error', e => { const im = e.target; if(!im || im.tagName !== 'IMG' || !/\/?pages\//.test(im.getAttribute('src') || '') || im.dataset.offmsg) return;
+  im.dataset.offmsg = 1; const d = document.createElement('div'); d.className = 'imgoff';
+  d.innerHTML = navigator.onLine === false ? '📴 離線時尚未下載此頁，請連線後到 ⚙︎ 設定按「下載全部離線資料」。' : '圖片載入失敗，請稍後再試。';
+  im.style.display = 'none'; im.insertAdjacentElement('afterend', d); }, true);
 async function openSettings(){
   $('#sheetBody').innerHTML = `<h2 style="margin-top:0">⚙︎ 設定</h2>
   <div class="card" style="display:grid;gap:12px">
     <div><b>語音來源</b><div class="seg" style="margin-top:6px"><button data-eng="mp3" class="${S.engine==='mp3'?'on':''}">預錄 MP3（建議）</button><button data-eng="tts" class="${S.engine==='tts'?'on':''}">裝置語音</button></div>
       <div class="small mute">MP3 為 AI 合成的日語語音（VOICEVOX，依標準重音調整），離線可播。裝置語音使用手機/電腦內建 ja-JP 語音${jaVoice?`（目前：${esc(jaVoice.name)}）`:'（尚未偵測到日語語音）'}。</div></div>
     <div><b>顯示假名讀音</b><div class="seg" style="margin-top:6px"><button data-kana="1" class="${S.showKana?'on':''}">顯示</button><button data-kana="0" class="${!S.showKana?'on':''}">隱藏</button></div></div>
-    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部音檔</button></div>
+    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 100 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 2.4（修正「〜ますか」重音與語調）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 3.0（撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
-  $('#cacheInfo').textContent = await cacheStatus();
+  $('#cacheInfo').innerHTML = await cacheStatus();
   document.querySelectorAll('[data-eng]').forEach(b => b.onclick = () => { S.engine = b.dataset.eng; save(); openSettings(); if(S.engine==='tts') speakTTS('こんにちは'); });
   document.querySelectorAll('[data-kana]').forEach(b => b.onclick = () => { S.showKana = b.dataset.kana==='1'; save(); openSettings(); route(); });
-  $('#dlAll').onclick = async () => {
-    if(!('caches' in window)) return toast('不支援');
-    const urls = B.dialogues.concat(Object.values(DRILL), Object.values(SPLITD), Object.values(SITUD)).flatMap(d=>d.lines.flatMap((_,i)=>[`audio/${d.id}_${i}.mp3`,`audio/${d.id}_${i}_s.mp3`]));
-    const c = await caches.open('nh-audio-v6'); let n=0;
-    for(const u of urls){ try{ if(!(await c.match(u))) await c.add(u); }catch(e){} n++; if(n%20===0) $('#cacheInfo').textContent = `下載中… ${n}/${urls.length}`; }
-    $('#cacheInfo').textContent = await cacheStatus();
-  };
+  $('#dlAll').onclick = () => downloadAllOffline($('#dlAll'), $('#cacheInfo'));
   $('#rsReview').onclick = () => { if(confirm('確定清空複習清單？')){ S.review = {}; save(); route(); openSettings(); } };
   $('#rsAll').onclick = () => { if(confirm('確定清除所有進度與複習清單？')){ S.done={}; S.quiz={}; S.review={}; save(); route(); openSettings(); } };
   $('#closeS').onclick = closeSheet;

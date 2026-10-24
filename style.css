@@ -512,3 +512,6 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .tools{flex:none}
 @media (max-width:400px){ .crumb::before{font-size:17px} }
 @media (max-width:380px){ .brand small{display:none} .chip{padding:4px 8px;font-size:13px} .tools{gap:4px} }
+/* 離線時尚未下載的課本圖片 */
+.imgoff{display:flex;align-items:center;justify-content:center;text-align:center;min-height:160px;padding:20px;margin:4px 0;border:1.5px dashed #c3cdc0;border-radius:10px;background:#f6f7f5;color:#545a55;font-size:14px;line-height:1.6}
+.pm-wrap .imgoff{max-width:600px;margin:12px auto;background:#fff}
