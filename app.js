@@ -279,7 +279,7 @@ function viewHome(){
   renderSide('home');
   const totalD = B.dialogues.length, doneD = B.dialogues.filter(d=>S.done[d.id]).length;
   $('#view').innerHTML = `
-  <div class="hero"><h1>撿角日語</h1><div class="sub">文化日本語 第1～17課 聽力練習</div></div>
+  <div class="hero"><h1>撿角日語</h1><div class="sub">文化日本語 第1～18課 聽力練習</div></div>
   <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
   ${searchFormHTML('', 'home')}
   <div class="row" style="margin:8px 0 14px">
@@ -412,8 +412,7 @@ const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.
 const BOOKL = {n:'b', t:'整本課本', pages:[0, 271]};
 const BOOK_TOC = [{t:'封面・はじめに・このテキストについて・目次', a:0, b:7}]
   .concat(B.lessons.map(l => ({t: l.n ? `第${l.n}課 ${l.t}` : l.t, a:l.pages[0], b:l.pages[1]})))
-  .concat([['第17課 アルバイト',192,203],['第18課 ドライブに行きませんか。',204,212],
-    ['付録：動詞・い形容詞・な形容詞一覧',213,219],['助数詞表',220,222],['文型一覧',223,229],['50音索引',230,252],['別冊 各課索引',253,271]].map(([t,a,b])=>({t,a,b})));
+  .concat([['付録：動詞・い形容詞・な形容詞一覧',213,219],['助数詞表',220,222],['文型一覧',223,229],['50音索引',230,252],['別冊 各課索引',253,271]].map(([t,a,b])=>({t,a,b})));
 const tocOf = p => BOOK_TOC.find(x => p>=x.a && p<=x.b) || BOOK_TOC[0];
 const pLabel = p => p>=254 ? `別冊 p.${p-254}` : p===253 ? '別冊 表紙' : `p.${p}`;
 const LOF = n => n==='b' ? BOOKL : LESSON[n];
@@ -928,7 +927,7 @@ function rpDraw(){
         <div class="rpcue open small">💡 ${esc(R[0])}</div>
         ${one('①', lab, 'txt', ln.ja, ln.kana, ln.zh, `data-act="rpplay" data-i="${cur}"`)}
         ${R[1].map((a, j) => one(j?'③':'②', '課外（非課本原文）', 'xtra', a[0], a[1], a[2], `data-act="rpalt" data-i="${cur}" data-a="${j}"`)).join('')}
-        <div class="small mute rpref">① 出處：${esc(s.ref)}・${esc(lineNo(d, cur).lab)}　②③ 為本 App 自編的自然說法（第1～17課程度）</div>
+        <div class="small mute rpref">① 出處：${esc(s.ref)}・${esc(lineNo(d, cur).lab)}　②③ 為本 App 自編的自然說法（第1～18課程度）</div>
         <div class="row rpacts">${s.recUrl?`<button class="btn sm ghost" data-act="rpmine">▶ 聽我的錄音</button><button class="btn sm ghost" data-act="rpcmp">🔁 原句＋我的錄音</button>`:''}
           <button class="btn" data-act="rpnext">繼續 ▶</button></div></div>`;
     }
@@ -1114,10 +1113,10 @@ async function openSettings(){
     <div><b>語音來源</b><div class="seg" style="margin-top:6px"><button data-eng="mp3" class="${S.engine==='mp3'?'on':''}">預錄 MP3（建議）</button><button data-eng="tts" class="${S.engine==='tts'?'on':''}">裝置語音</button></div>
       <div class="small mute">MP3 為 AI 合成的日語語音（VOICEVOX，依標準重音調整），離線可播。裝置語音使用手機/電腦內建 ja-JP 語音${jaVoice?`（目前：${esc(jaVoice.name)}）`:'（尚未偵測到日語語音）'}。</div></div>
     <div><b>顯示假名讀音</b><div class="seg" style="margin-top:6px"><button data-kana="1" class="${S.showKana?'on':''}">顯示</button><button data-kana="0" class="${!S.showKana?'on':''}">隱藏</button></div></div>
-    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 160 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
+    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 170 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 3.7（新增第17課 アルバイト・文型每一句右邊 📖 看課本截圖・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 3.8（新增第18課 ドライブに行きませんか。・文型每一句右邊 📖 看課本截圖・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
