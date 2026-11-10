@@ -279,7 +279,7 @@ function viewHome(){
   renderSide('home');
   const totalD = B.dialogues.length, doneD = B.dialogues.filter(d=>S.done[d.id]).length;
   $('#view').innerHTML = `
-  <div class="hero"><h1>撿角日語</h1><div class="sub">文化日本語 第1～16課 聽力練習</div></div>
+  <div class="hero"><h1>撿角日語</h1><div class="sub">文化日本語 第1～17課 聽力練習</div></div>
   <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
   ${searchFormHTML('', 'home')}
   <div class="row" style="margin:8px 0 14px">
@@ -846,7 +846,7 @@ function finishQ(){
    選一個角色 → 對方的句子照順序播放（文字先隱藏，可點開）→ 輪到你時停下來，只顯示場景／插圖／角色名稱「輪到你了，請開口說」
    💡 看提示（點了才顯示：說意圖，不翻譯）、🔁 再聽一次對方、🎙 錄音（可選）→「我講完了，看答案」：①原句 ②③另外兩種說法（課外）
    內容：rp.js（window.RP，點開才載入）；音檔 audio/<對話id>-r_<句號>_<0|1>.mp3（只在播放時下載） */
-const RP_SKIPD = new Set(['8-T1','13-T3','14-T1','14-T2']), RP_SKIPR = new Set(['みんな','ワン・アルン','リー・ラフル','田中・加藤']);
+const RP_SKIPD = new Set(['8-T1','13-T3','14-T1','14-T2','17-T1']), RP_SKIPR = new Set(['みんな','ワン・アルン','リー・ラフル','田中・加藤']);
 function rpRoles(d, idxs){ const seen = []; idxs.forEach(i => { const ln = d.lines[i]; if(ln.scene || RP_SKIPR.has(d.sp[ln.s].name) || seen.includes(ln.s)) return; seen.push(ln.s); }); return seen; }
 function rpOK(d, idxs){ return !RP_SKIPD.has(d.id) && rpRoles(d, idxs).length >= 2; }
 function rpBtn(id, g){ return `<button class="rpbtn" data-act="rp" data-d="${id}"${g!=null?` data-g="${g}"`:''} title="選一個角色，輪到你時開口說">🗣 開口練習</button>`; }
@@ -928,7 +928,7 @@ function rpDraw(){
         <div class="rpcue open small">💡 ${esc(R[0])}</div>
         ${one('①', lab, 'txt', ln.ja, ln.kana, ln.zh, `data-act="rpplay" data-i="${cur}"`)}
         ${R[1].map((a, j) => one(j?'③':'②', '課外（非課本原文）', 'xtra', a[0], a[1], a[2], `data-act="rpalt" data-i="${cur}" data-a="${j}"`)).join('')}
-        <div class="small mute rpref">① 出處：${esc(s.ref)}・${esc(lineNo(d, cur).lab)}　②③ 為本 App 自編的自然說法（第1～16課程度）</div>
+        <div class="small mute rpref">① 出處：${esc(s.ref)}・${esc(lineNo(d, cur).lab)}　②③ 為本 App 自編的自然說法（第1～17課程度）</div>
         <div class="row rpacts">${s.recUrl?`<button class="btn sm ghost" data-act="rpmine">▶ 聽我的錄音</button><button class="btn sm ghost" data-act="rpcmp">🔁 原句＋我的錄音</button>`:''}
           <button class="btn" data-act="rpnext">繼續 ▶</button></div></div>`;
     }
@@ -1114,10 +1114,10 @@ async function openSettings(){
     <div><b>語音來源</b><div class="seg" style="margin-top:6px"><button data-eng="mp3" class="${S.engine==='mp3'?'on':''}">預錄 MP3（建議）</button><button data-eng="tts" class="${S.engine==='tts'?'on':''}">裝置語音</button></div>
       <div class="small mute">MP3 為 AI 合成的日語語音（VOICEVOX，依標準重音調整），離線可播。裝置語音使用手機/電腦內建 ja-JP 語音${jaVoice?`（目前：${esc(jaVoice.name)}）`:'（尚未偵測到日語語音）'}。</div></div>
     <div><b>顯示假名讀音</b><div class="seg" style="margin-top:6px"><button data-kana="1" class="${S.showKana?'on':''}">顯示</button><button data-kana="0" class="${!S.showKana?'on':''}">隱藏</button></div></div>
-    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 150 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
+    <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 160 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 3.6（新增第16課 病院・文型每一句右邊 📖 看課本截圖・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  <div class="foot">版本 3.7（新增第17課 アルバイト・文型每一句右邊 📖 看課本截圖・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
