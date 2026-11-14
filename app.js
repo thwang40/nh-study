@@ -1119,7 +1119,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.9（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.10（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

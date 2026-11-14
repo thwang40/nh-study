@@ -1,16 +1,12 @@
-/* 撿角日語 — Firebase 網頁設定。
-   專案還沒開好之前請保持 null：登入按鈕會完全隱藏，App 行為與現在相同，也不會載入 Firebase SDK。
-
-   專案開好後，把 window.FB_CONFIG 改成 Firebase 主控台
-   「專案設定 → 您的應用程式 → SDK 設定和設定」裡的 firebaseConfig 物件，欄位包含：
-     apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId
-   authDomain 一般是 <projectId>.firebaseapp.com。
-
-   Authentication → Settings → Authorized domains 必須加上：
-     thwang40.github.io
-   （localhost 預設已有，本機測試用。）
-
-   另外請啟用 Authentication 的 Google 提供者，並把 firestore.rules 貼到
-   Firestore → 規則。
+/* 撿角日語 — Firebase 網頁設定（專案 nh-study-sync）。
+   這組值是 Firebase 網頁 SDK 的公開設定（安全靠 Authorized domains 與 Firestore 規則）。
+   若改回 null，登入按鈕會完全隱藏，也不會載入 Firebase SDK。
 */
-window.FB_CONFIG = null;
+window.FB_CONFIG = {
+  apiKey: "AIzaSyCpC_nPAG-t2HgnAw5szAf9_EhZTLXV-Uc",
+  authDomain: "nh-study-sync.firebaseapp.com",
+  projectId: "nh-study-sync",
+  storageBucket: "nh-study-sync.firebasestorage.app",
+  messagingSenderId: "677067855657",
+  appId: "1:677067855657:web:f6374c477a8920a27c0938"
+};
