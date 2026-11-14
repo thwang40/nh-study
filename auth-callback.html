@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>登入中…</title>
+<meta name="theme-color" content="#013438">
+<style>
+  html,body{margin:0;min-height:100%;background:#f6f7f5;color:#231f20;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;display:flex;align-items:center;justify-content:center}
+  p{font-size:16px;color:#666363}
+</style>
+</head>
+<body>
+<p>正在回到撿角日語…</p>
+<script>
+(function () {
+  var raw = '';
+  var h = (location.hash || '').replace(/^#/, '');
+  var q = (location.search || '').replace(/^\?/, '');
+  if (/(?:^|&)(id_token|error)=/.test(h)) raw = h;
+  else if (/(?:^|&)(id_token|error)=/.test(q)) raw = q;
+  try {
+    if (raw) sessionStorage.setItem('nhSync.oauthReturn', raw);
+    sessionStorage.setItem('nhSync.authPending', 'oauth');
+  } catch (e) {}
+  var path = location.pathname.replace(/[^/]+$/, '');
+  location.replace(path + '#/');
+})();
+</script>
+</body>
+</html>

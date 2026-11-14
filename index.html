@@ -13,6 +13,21 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
+<script>
+/* 在 hash 路由啟動前，先把 Google OAuth 回傳的 id_token 收進 sessionStorage */
+(function(){
+  try {
+    var h = (location.hash || '').replace(/^#/, '');
+    var q = (location.search || '').replace(/^\?/, '');
+    var look = function(s){ return /(?:^|&)(id_token|error)=/.test(s); };
+    var src = look(h) ? h : (look(q) ? q : '');
+    if (src) {
+      sessionStorage.setItem('nhSync.oauthReturn', src);
+      history.replaceState(null, '', location.pathname + '#/');
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <header class="top">
@@ -36,6 +51,7 @@
 <script src="blk.js"></script>
 <script src="firebase-config.js"></script>
 <script src="sync-merge.js"></script>
+<script src="sync-auth.js"></script>
 <script src="app.js"></script>
 <script src="sync.js"></script>
 </body>
