@@ -9,7 +9,7 @@ function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
 // 聽力優先 is always the default. 顯示全文 is now a per-block toggle (blkBtn) that only lasts for the page you are on and is never stored.
 // (Older versions saved listenFirst:false in localStorage, which made every page open with the text shown.)
 S.listenFirst = true;
-function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); }
+function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); if(!save._quiet && window.NhSync) window.NhSync.notifyLocalChange(); }
 try{ if(JSON.parse(localStorage.getItem(LS_KEY)||'{}').listenFirst !== undefined) save(); }catch(e){}
 // v3.1: default speed is 1x; reset once anyone who was left on the old 0.7x setting.
 if(S.spd1 !== 1){ S.speed = 1; S.spd1 = 1; try{ save(); }catch(e){} }
@@ -291,6 +291,7 @@ function viewHome(){
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
     return `<a class="card" href="#/l/${l.n}"><div class="lnum">${lessonLabel(l.n)} ${UNCERTAIN[l.n]?'<span class="badge u">部分推定</span>':''}</div><div class="ltitle">${esc(l.t)}</div><div class="small mute">${esc(l.zh)}</div><div class="small mute">${esc(l.topic)}</div>
     <div class="bar"><i style="width:${p.pct}%"></i></div><div class="small mute" style="margin-top:4px">${p.done}/${p.total} 對話${q.length?`・測驗最佳 ${Math.max(...q)}%`:''}</div></a>`; }).join('')}</div>
+  ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('home') : ''}
   <h2>📱 加到主畫面（離線也能複習）</h2>
   <div class="card small">
     <div><b>iPhone（Safari）</b>：點下方「分享」→「加入主畫面」。</div>
@@ -300,6 +301,7 @@ function viewHome(){
   </div>
   <div class="foot">出處說明：課名、本文、文型編號與頁碼皆依使用者提供的《文化初級日本語Ⅰ テキスト改訂版》課本 PDF 整理；標「課本原文」者為課本本文逐句收錄（註明頁碼），同文型聽力練習全部為課本文型例句與練習例（標頁碼）；標「實用會話」者為本 App 依該課及之前文型自編。單字中文參考官方語彙表（繁體中文）。語音為 AI 合成（非課本 CD），使用 VOICEVOX（VOICEVOX:No.7、VOICEVOX:冥鳴ひまり、VOICEVOX:玄野武宏、VOICEVOX:雀松朱司）。僅供個人學習使用。</div>
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:10px 0 4px;font-size:11px;color:#9aa0a6"><span id="viewCount">${viewCountText()}</span><a href="https://thwang40.github.io/jimtof-talk/" style="color:#9aa0a6;text-decoration:none">展會會話 ›</a></div>`;
+  if(window.NhSync) NhSync.bindPanel($('#view'));
 }
 
 function viewLesson(n){
@@ -1025,7 +1027,7 @@ document.addEventListener('click', e => {
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
   else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(innerWidth < SIDE_MIN || b.classList.contains('blkinl-x')) toggleBlkInline(d, +b.dataset.i); else if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
-  else if(act==='got'){ delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
+  else if(act==='got'){ if(window.SyncMerge) SyncMerge.tomb(S,'review',b.dataset.k); delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
 $('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
 $('#settingsBtn').onclick = openSettings;
@@ -1033,7 +1035,7 @@ $('#sheet').addEventListener('click', e => { if(e.target.id==='sheet') closeShee
 document.addEventListener('change', e => {
   const cb = e.target.closest && e.target.closest('input[data-uf]'); if(!cb) return;
   const k = cb.dataset.uf;
-  if(cb.checked) S.unf[k] = Date.now(); else delete S.unf[k];
+  if(cb.checked) S.unf[k] = Date.now(); else { if(window.SyncMerge) SyncMerge.tomb(S,'unf',k); delete S.unf[k]; }
   save();
   document.querySelectorAll(`.line[data-key="${k}"]`).forEach(el => el.classList.toggle('unf', cb.checked));
   const sl = document.querySelector('#side a[href="#/review"]'); if(sl) sl.textContent = `📝 複習清單（${revCount()}）`;
@@ -1116,16 +1118,18 @@ async function openSettings(){
     <div><b>離線</b><div class="small" id="cacheInfo">檢查中…</div><button class="btn sm ghost" id="dlAll" style="margin-top:6px">⬇︎ 下載全部離線資料（音檔＋課本圖片，約 170 MB）</button><div class="small mute" style="margin-top:4px">只下載還沒存的；建議連 Wi-Fi。</div></div>
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
-  <div class="foot">版本 3.8（新增第18課 ドライブに行きませんか。・文型每一句右邊 📖 看課本截圖・撿角日語：新配色、🔍 搜尋與聽力模式、🗣 開口練習、單字發音）・資料儲存在本裝置（localStorage），不同裝置之間不會同步。</div>
+  ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
+  <div class="foot">版本 3.9（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
   document.querySelectorAll('[data-eng]').forEach(b => b.onclick = () => { S.engine = b.dataset.eng; save(); openSettings(); if(S.engine==='tts') speakTTS('こんにちは'); });
   document.querySelectorAll('[data-kana]').forEach(b => b.onclick = () => { S.showKana = b.dataset.kana==='1'; save(); openSettings(); route(); });
   $('#dlAll').onclick = () => downloadAllOffline($('#dlAll'), $('#cacheInfo'));
-  $('#rsReview').onclick = () => { if(confirm('確定清空複習清單？')){ S.review = {}; save(); route(); openSettings(); } };
-  $('#rsAll').onclick = () => { if(confirm('確定清除所有進度與複習清單？')){ S.done={}; S.quiz={}; S.review={}; save(); route(); openSettings(); } };
+  $('#rsReview').onclick = () => { if(confirm('確定清空複習清單？')){ if(window.SyncMerge) SyncMerge.tombAll(S,'review'); S.review = {}; save(); route(); openSettings(); } };
+  $('#rsAll').onclick = () => { if(confirm('確定清除所有進度與複習清單？')){ if(window.SyncMerge){ SyncMerge.tombAll(S,'review'); SyncMerge.tombAll(S,'done'); SyncMerge.tombAll(S,'quiz'); } S.done={}; S.quiz={}; S.review={}; save(); route(); openSettings(); } };
   $('#closeS').onclick = closeSheet;
+  if(window.NhSync) NhSync.bindPanel($('#sheetBody'));
 }
 
 /* ---------------- 🔍 搜尋 ----------------
@@ -1274,6 +1278,7 @@ async function countView(){
     VC = {total, today}; const el = document.getElementById('viewCount'); if(el) el.textContent = viewCountText();
   }catch(e){ VC = null; }
 }
+window.NhApp = { S, save, LS_KEY, toast, route, esc, updateChips };
 route();
 setTimeout(countView, 1500); // after first render; never blocks the app
 

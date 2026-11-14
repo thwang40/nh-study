@@ -1,0 +1,196 @@
+/* 複習清單／進度合併（本機 + 雲端）。
+   給 Node 測試與瀏覽器一起用。不依賴 Firebase。
+   本機 UI 形狀維持不變：
+     review: { [id]: { n, t, why } }
+     unf:    { [id]: number }
+     done:   { [id]: true }
+     quiz:   { [id]: number }
+   另外寫在同一個 localStorage key 裡、UI 不讀的欄位：
+     tomb:   { review:{}, unf:{}, done:{}, quiz:{} }  // 刪除時間（tombstones）
+     doneAt: { [id]: ts }
+     quizAt: { [id]: ts }
+   雲端 users/{uid} 形狀：各 map 的值帶 updatedAt，刪除則 { deleted:true, updatedAt }。
+*/
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.SyncMerge = factory();
+})(typeof window !== 'undefined' ? window : globalThis, function () {
+  'use strict';
+
+  const KINDS = ['review', 'unf', 'done', 'quiz'];
+
+  function emptyPacked() {
+    return { review: {}, unf: {}, done: {}, quiz: {}, updatedAt: 0 };
+  }
+
+  function ensureMeta(S) {
+    if (!S.tomb || typeof S.tomb !== 'object') S.tomb = {};
+    KINDS.forEach(k => { if (!S.tomb[k] || typeof S.tomb[k] !== 'object') S.tomb[k] = {}; });
+    if (!S.doneAt || typeof S.doneAt !== 'object') S.doneAt = {};
+    if (!S.quizAt || typeof S.quizAt !== 'object') S.quizAt = {};
+    return S;
+  }
+
+  function tomb(S, kind, key, ts) {
+    ensureMeta(S);
+    S.tomb[kind][key] = ts || Date.now();
+    if (kind === 'done') delete S.doneAt[key];
+    if (kind === 'quiz') delete S.quizAt[key];
+  }
+
+  function tombAll(S, kind, ts) {
+    ts = ts || Date.now();
+    Object.keys(S[kind] || {}).forEach(k => tomb(S, kind, k, ts));
+  }
+
+  function packLocal(S, now) {
+    now = now || Date.now();
+    ensureMeta(S);
+    const out = emptyPacked();
+
+    Object.entries(S.review || {}).forEach(([k, v]) => {
+      if (!v) return;
+      const updatedAt = Math.max(+v.t || 0, 0) || now;
+      out.review[k] = { n: v.n || 0, t: v.t || updatedAt, why: v.why || '', updatedAt };
+    });
+    Object.entries(S.tomb.review).forEach(([k, ts]) => {
+      if (out.review[k]) return;
+      out.review[k] = { deleted: true, updatedAt: +ts || now };
+    });
+
+    Object.entries(S.unf || {}).forEach(([k, t]) => {
+      const updatedAt = typeof t === 'number' ? t : now;
+      out.unf[k] = { t: updatedAt, updatedAt };
+    });
+    Object.entries(S.tomb.unf).forEach(([k, ts]) => {
+      if (out.unf[k]) return;
+      out.unf[k] = { deleted: true, updatedAt: +ts || now };
+    });
+
+    Object.entries(S.done || {}).forEach(([k, v]) => {
+      if (!v) return;
+      if (!S.doneAt[k]) S.doneAt[k] = now;
+      out.done[k] = { updatedAt: S.doneAt[k] };
+    });
+    Object.entries(S.tomb.done).forEach(([k, ts]) => {
+      if (out.done[k]) return;
+      out.done[k] = { deleted: true, updatedAt: +ts || now };
+    });
+
+    Object.entries(S.quiz || {}).forEach(([k, score]) => {
+      if (score == null) return;
+      if (!S.quizAt[k]) S.quizAt[k] = now;
+      out.quiz[k] = { score: +score, updatedAt: S.quizAt[k] };
+    });
+    Object.entries(S.tomb.quiz).forEach(([k, ts]) => {
+      if (out.quiz[k]) return;
+      out.quiz[k] = { deleted: true, updatedAt: +ts || now };
+    });
+
+    out.updatedAt = now;
+    return out;
+  }
+
+  function pickNewer(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const ta = a.updatedAt || 0, tb = b.updatedAt || 0;
+    if (ta !== tb) return ta > tb ? a : b;
+    if (a.deleted && !b.deleted) return b;
+    if (b.deleted && !a.deleted) return a;
+    return a;
+  }
+
+  function mergeQuiz(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    if (!a.deleted && !b.deleted) {
+      const score = Math.max(a.score || 0, b.score || 0);
+      const updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);
+      const src = (a.score || 0) >= (b.score || 0) ? a : b;
+      return { score, updatedAt, ...(src && src.n != null ? { n: src.n } : {}) };
+    }
+    return pickNewer(a, b);
+  }
+
+  function mergeDone(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    if (!a.deleted && !b.deleted) {
+      return { updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0) };
+    }
+    return pickNewer(a, b);
+  }
+
+  function mergeMaps(a, b, kind) {
+    const out = {};
+    const keys = new Set([].concat(Object.keys(a || {}), Object.keys(b || {})));
+    keys.forEach(k => {
+      if (kind === 'quiz') out[k] = mergeQuiz(a[k], b[k]);
+      else if (kind === 'done') out[k] = mergeDone(a[k], b[k]);
+      else out[k] = pickNewer(a[k], b[k]);
+    });
+    return out;
+  }
+
+  function merge(localPacked, cloud) {
+    const l = localPacked || emptyPacked();
+    const c = cloud || emptyPacked();
+    return {
+      review: mergeMaps(l.review, c.review, 'review'),
+      unf: mergeMaps(l.unf, c.unf, 'unf'),
+      done: mergeMaps(l.done, c.done, 'done'),
+      quiz: mergeMaps(l.quiz, c.quiz, 'quiz'),
+      updatedAt: Math.max(l.updatedAt || 0, c.updatedAt || 0)
+    };
+  }
+
+  function applyToLocal(S, packed) {
+    ensureMeta(S);
+    const review = {};
+    S.tomb.review = {};
+    Object.entries((packed && packed.review) || {}).forEach(([k, v]) => {
+      if (v && v.deleted) S.tomb.review[k] = v.updatedAt;
+      else if (v) review[k] = { n: v.n || 0, t: v.t || v.updatedAt || 0, why: v.why || '' };
+    });
+    S.review = review;
+
+    const unf = {};
+    S.tomb.unf = {};
+    Object.entries((packed && packed.unf) || {}).forEach(([k, v]) => {
+      if (v && v.deleted) S.tomb.unf[k] = v.updatedAt;
+      else if (v) unf[k] = v.t || v.updatedAt;
+    });
+    S.unf = unf;
+
+    const done = {};
+    S.tomb.done = {};
+    const doneAt = {};
+    Object.entries((packed && packed.done) || {}).forEach(([k, v]) => {
+      if (v && v.deleted) S.tomb.done[k] = v.updatedAt;
+      else if (v) { done[k] = true; doneAt[k] = v.updatedAt; }
+    });
+    S.done = done;
+    S.doneAt = doneAt;
+
+    const quiz = {};
+    S.tomb.quiz = {};
+    const quizAt = {};
+    Object.entries((packed && packed.quiz) || {}).forEach(([k, v]) => {
+      if (v && v.deleted) S.tomb.quiz[k] = v.updatedAt;
+      else if (v) { quiz[k] = v.score; quizAt[k] = v.updatedAt; }
+    });
+    S.quiz = quiz;
+    S.quizAt = quizAt;
+    return S;
+  }
+
+  /* pack local, merge with cloud, apply back. Returns the merged packed doc. */
+  function mergeInto(S, cloud, now) {
+    const merged = merge(packLocal(S, now), cloud);
+    applyToLocal(S, merged);
+    return merged;
+  }
+
+  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer };
+});

@@ -548,3 +548,15 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .blkinl-wrap img{display:block;width:100%;height:auto;cursor:zoom-in}
 .blkinl-wrap img.z{width:200%;cursor:zoom-out}
 .blkinl-wrap+.blkinl-wrap{margin-top:8px}
+
+/* optional Google sync (hidden entirely when FB_CONFIG is null) */
+.sync-card{padding:10px 12px;margin:10px 0 14px}
+.sync-card .sync-row{display:flex;align-items:center;gap:10px}
+.sync-card .sync-av{width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--pale);color:var(--teal);flex:none}
+.sync-card .sync-av-fallback{display:inline-grid;place-items:center;font-size:16px}
+.sync-card .sync-meta{min-width:0;flex:1}
+.sync-card .sync-meta b{display:block;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-card .sync-meta span{display:block;font-size:12px;color:var(--mute)}
+.sync-card .sync-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sync-btn-login{width:100%;justify-content:center;display:flex;align-items:center;gap:6px;font-weight:700}
+.sync-err{color:var(--alert);font-size:12px;margin-top:6px}
