@@ -258,9 +258,14 @@ function addReview(d, i, why){
 }
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.add('hidden'), 1800); }
 function updateChips(){
-  $('#reviewCount').textContent = revCount();
+  const n = revCount();
+  const rc = $('#reviewCount'); if(rc) rc.textContent = n;
   $('#speedBtn').textContent = (S.speed<1?'0.7':'1.0') + 'x';
   $('#speedBtn').classList.toggle('on', S.speed<1);
+  document.querySelectorAll('a[href="#/review"]').forEach(a => {
+    if(a.id==='reviewChip') return;
+    if(/複習清單/.test(a.textContent||'')) a.textContent = `📝 複習清單（${n}）`;
+  });
 }
 function lessonProgress(n){
   const ds = n===0 ? FLOW[0] : B.dialogues.filter(d=>d.l===n); const done = ds.filter(d=>S.done[d.id]).length;
@@ -1119,7 +1124,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.11（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.12（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -1238,9 +1243,7 @@ document.addEventListener('click', e => { const a = e.target.closest('a.sgo'); i
   if(location.hash === a.getAttribute('href')){ e.preventDefault(); route(); } });
 
 /* ---------------- router ---------------- */
-function route(){
-  stopAll(); closeSheet();
-  if(!location.hash.startsWith('#/p/')) pv = null;
+function renderRoute(){
   const h = location.hash.replace(/^#\/?/, '');
   const [a, b] = h.split('/');
   if(a==='l') viewLesson(+b);
@@ -1251,8 +1254,24 @@ function route(){
   else if(a==='p') viewPage(b==='b' ? 'b' : +b, +(h.split('/')[2]||0));
   else if(a==='s'){ let q = ''; try{ q = decodeURIComponent(h.slice(2)); }catch(e){ q = h.slice(2); } viewSearch(q); }
   else viewHome();
+}
+function route(){
+  stopAll(); closeSheet();
+  if(!location.hash.startsWith('#/p/')) pv = null;
+  renderRoute();
   updateChips(); window.scrollTo(0,0);
   if(pendingHL) setTimeout(applyHL, 60);
+}
+/* 雲端合併後立刻重畫目前頁面與側欄（不關掉設定、不把捲動跳回頂端；播放中只更新計數以免中斷）。 */
+function refreshView(){
+  const y = window.scrollY;
+  if(typeof curPlaying!=='undefined' && curPlaying){
+    updateChips();
+    return;
+  }
+  renderRoute();
+  updateChips();
+  window.scrollTo(0, y);
 }
 window.addEventListener('hashchange', () => { if(sAllOn){ sAllOn = false; stopAll(); } S.listenFirst = true; reveal = {}; route(); syncBookPanel(); });
 /* ---------------- page-view counter (footer) ----------------
@@ -1278,7 +1297,7 @@ async function countView(){
     VC = {total, today}; const el = document.getElementById('viewCount'); if(el) el.textContent = viewCountText();
   }catch(e){ VC = null; }
 }
-window.NhApp = { S, save, LS_KEY, toast, route, esc, updateChips };
+window.NhApp = { S, save, LS_KEY, toast, route, refreshView, esc, updateChips };
 route();
 setTimeout(countView, 1500); // after first render; never blocks the app
 

@@ -160,6 +160,7 @@
       try {
         root.SyncMerge.applyToLocal(S, merged);
         appSave(true);
+        if (root.NhApp && typeof root.NhApp.refreshView === 'function') root.NhApp.refreshView();
       } finally { applying = false; }
       lastSynced = Date.now();
       pending = false;

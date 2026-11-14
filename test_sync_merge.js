@@ -214,4 +214,76 @@ t('mergeInto writes merged state back onto S', () => {
   assert.ok(S.review.a && S.review.b);
 });
 
+
+// 16. iPhone-like cloud (162 review, 27 done, quiz best) unions into a desktop with 5 review + 1 done
+t('desktop with 5 reviews + 1 done unions iPhone 162/27/quiz and re-applies to UI shapes', () => {
+  const now = 2_000_000_000_000;
+  const iphoneReview = {};
+  for (let i = 0; i < 162; i++) {
+    const lesson = 1 + (i % 18);
+    iphoneReview[lesson + '-T1:' + i] = { n: 1, t: 1_700_000_000_000 + i, why: 'idk' };
+  }
+  const iphoneDone = {};
+  const iphoneQuiz = {};
+  // 第1課 3/5, 第2課 3/4, 第3課 3/3, 第4課 4/4, 第5課 3/4  → 3+3+3+4+3 = 16, plus more to reach 27
+  const doneIds = ['1-T1','1-T2','1-T3','2-T1','2-T2','2-1','3-T1','3-T2','3-1','4-T1','4-T2','4-1','4-2','5-T1','5-T2','5-1'];
+  // pad to 27
+  const extra = ['6-T1','6-T2','6-1','7-T1','7-T2','8-T1','8-T2','9-T1','10-T1','11-T1','12-T1'];
+  doneIds.concat(extra).slice(0, 27).forEach((id, i) => { iphoneDone[id] = true; iphoneQuiz[id] = (id.startsWith('1-') ? 100 : 80); });
+  const iphone = localS({ review: iphoneReview, done: iphoneDone, quiz: iphoneQuiz });
+  const cloud = M.packLocal(iphone, now);
+
+  const deskReview = {};
+  for (let i = 0; i < 5; i++) deskReview['18-T1:' + i] = { n: 1, t: now - 1000, why: 'quiz' };
+  const desk = localS({
+    review: deskReview,
+    done: { '1-T1': true },
+    quiz: { '1-T1': 60 }
+  });
+  M.mergeInto(desk, cloud, now + 1);
+
+  assert.strictEqual(Object.keys(desk.review).length, 162 + 5); // 18-T1:0..4 are new keys not in the 162
+  // wait: iphone keys are `${lesson}-T1:${i}` for i=0..161, including 18-T1:17 etc. not 18-T1:0..4?
+  // lesson 18 when i%18===17 → 18-T1:17, 18-T1:35, ... 18-T1:0 would happen when i=17? 1+(i%18)=18 when i%18=17, i=17,35,...
+  // 18-T1:0 is i=0 → lesson 1, key 1-T1:0. So 18-T1:0..4 are unique. 162+5=167.
+  assert.strictEqual(Object.keys(desk.done).length, 27);
+  assert.strictEqual(desk.done['1-T1'], true);
+  assert.strictEqual(desk.done['4-T2'], true);
+  assert.strictEqual(desk.quiz['1-T1'], 100); // best score wins over desktop 60
+  assert.strictEqual(desk.quiz['2-T1'], 80);
+  assert.strictEqual(desk.speed, 1); // prefs untouched
+});
+
+t('merge is commutative: packing desktop first then iphone yields the same union', () => {
+  const now = 3_000_000_000_000;
+  const A = localS({
+    review: { a: { n: 1, t: 10, why: 'x' }, b: { n: 1, t: 11, why: 'y' } },
+    done: { '1-T1': true, '1-T2': true },
+    quiz: { '1-T1': 100, '1-T2': 90 }
+  });
+  const B = localS({
+    review: { c: { n: 1, t: 12, why: 'z' }, a: { n: 2, t: 9, why: 'old' } },
+    done: { '1-T1': true, '2-T1': true },
+    quiz: { '1-T1': 40, '2-T1': 70 }
+  });
+  const left = localS(JSON.parse(JSON.stringify(A)));
+  const right = localS(JSON.parse(JSON.stringify(B)));
+  M.mergeInto(left, M.packLocal(B, now), now);
+  M.mergeInto(right, M.packLocal(A, now), now);
+  assert.deepStrictEqual(Object.keys(left.review).sort(), Object.keys(right.review).sort());
+  assert.deepStrictEqual(Object.keys(left.done).sort(), Object.keys(right.done).sort());
+  assert.strictEqual(left.quiz['1-T1'], 100);
+  assert.strictEqual(right.quiz['1-T1'], 100);
+  assert.strictEqual(left.quiz['2-T1'], 70);
+  assert.ok(left.review.a.n === 1 && left.review.a.why === 'x'); // newer t=10 wins over t=9
+});
+
+t('revCount-style union (review ∪ unf) stays consistent after merge', () => {
+  const A = localS({ review: { r1: { n: 1, t: 1, why: 'x' }, r2: { n: 1, t: 1, why: 'x' } }, unf: { r1: 5, u1: 6 } });
+  const B = localS({ review: { r3: { n: 1, t: 2, why: 'y' } }, unf: { u2: 7 } });
+  M.mergeInto(A, M.packLocal(B, 9), 9);
+  const count = new Set(Object.keys(A.review).concat(Object.keys(A.unf||{}))).size;
+  assert.strictEqual(count, 5); // r1,r2,r3,u1,u2
+});
+
 console.log('\n' + passed + ' tests passed');
