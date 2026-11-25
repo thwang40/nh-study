@@ -53,6 +53,17 @@ Object.entries(B.drills||{}).forEach(([k, items]) => { const g = B.grammar[k]; i
     sp:{A:{name:'女',voice:'f'}, B:{name:'男',voice:'m'}},
     lines: items.map(it => ({s: it.v[0]==='m'?'B':'A', ja:it.ja, kana:it.kana, zh:it.zh, g:[k], v:[], x:it.x||null, pg:it.pg, tag:it.tag}))};
   DRILL[k] = d; DLG[d.id] = d; });
+/* 單語（目前先做第12課）：虛擬對話 t12，音檔 audio/t12_<i>.mp3，複習 key 為 t12:i，可走既有同步 */
+function registerTango(){
+  Object.entries(B.tango || {}).forEach(([n, T]) => {
+    const id = 't' + n;
+    const d = {id, l:+n, tango:true, title:'單語', scene:'先聽再看・官方單語表',
+      src:{label:'單語', page:(T.pages&&T.pages[0])||null, pages:T.pages||[], book:T.source||'官方單語表'},
+      sp:{A:{name:'單語', voice:'f'}}, lines: (T.lines || []).map(x => Object.assign({}, x))};
+    DLG[id] = d;
+  });
+}
+registerTango();
 // 課本頁序：每課依課本頁面順序交錯排列「本文」與「文型」，同一頁先出現者在前；實用會話（自編）放最後
 const GFIRST = {'1-3':1, '7-5':1, '15-3':1, '15-4':1}; // 這兩頁課本是「文型」印在「本文」上面（p.26、p.93）
 function flowOf(n){
@@ -104,7 +115,7 @@ function setPlaying(key){
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); const dt = el && el.closest('details'); if(dt && !dt.open) dt.open = true; if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
-  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.tango ? `第${d.l}課 單語 p.${d.lines[+i]&&d.lines[+i].pg||''}` : d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -134,8 +145,8 @@ async function playLine(d, i, token){
   const ln = d.lines[i];
   if(S.engine === 'mp3'){
     try{ await playMP3(`audio/${d.id}_${i}${S.speed<1?'_s':''}.mp3`, token); }
-    catch(e){ if(token !== playToken) return false; toast('MP3 載入失敗，改用裝置語音'); await speakTTS(ln.ja, token); }
-  } else { await speakTTS(ln.ja, token); }
+    catch(e){ if(token !== playToken) return false; toast('MP3 載入失敗，改用裝置語音'); await speakTTS(ln.say||ln.ja, token); }
+  } else { await speakTTS(ln.say||ln.ja, token); }
   if(token !== playToken) return false;
   setPlaying(null); return true;
 }
@@ -204,7 +215,15 @@ function situSrcHTML(d, i){
   if(ln.w && ln.w.length) h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.w.map(([w,r,zh]) => `<span>${esc(w)}${r!==w?`（${esc(r)}）`:''}＝${esc(zh)}</span>`).join('') + `</div>`;
   return h + `</div>`;
 }
+function tangoSrcHTML(d, i){
+  const ln = d.lines[i], L = LESSON[d.l], src = (d.src && d.src.book) || '官方單語表';
+  let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》第${d.l}課「${esc(L.t)}」（${esc(L.zh)}）</div>`;
+  h += `<div style="margin-top:4px"><span class="tag txt">單語</span> ${esc(src)}・<b>p.${ln.pg||d.src.page}</b>・${esc(ln.kind==='expr' ? 'いろいろな表現 '+ln.no : '單語 '+ln.no)}</div>`;
+  h += `<div class="small mute" style="margin-top:6px">先聽再看。點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文。</div>`;
+  return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/t/${d.l}">🎧 第${d.l}課全部單語 ›</a></div></div>`;
+}
 function srcHTML(d, i){
+  if(d.tango) return tangoSrcHTML(d, i);
   if(d.drill) return drillSrcHTML(d, i);
   if(d.situ) return situSrcHTML(d, i);
   const ln = d.lines[i]; const L = LESSON[d.l];
@@ -309,6 +328,82 @@ function viewHome(){
   if(window.NhSync) NhSync.bindPanel($('#view'));
 }
 
+function tangoLessonCard(n){
+  const T = B.tango[n], nw = (T.words||[]).length, ne = (T.expr||[]).length;
+  const q = DLG['t'+n] && S.quiz['t'+n] != null ? `・測驗最佳 ${S.quiz['t'+n]}%` : '';
+  return `<h2>📝 本課單語</h2>
+  <a class="card tango-card" href="#/t/${n}" style="text-decoration:none;display:block">
+    <div class="lnum"><span class="badge txt">單語</span> ${T.source||'官方單語表'} p.${(T.pages&&T.pages.length)?(T.pages[0]+'–'+T.pages[T.pages.length-1]):''}</div>
+    <div class="ltitle">先聽再看・第${n}課單語</div>
+    <div class="small mute">${nw} 個單語${ne?`＋${ne} 句「いろいろな表現」`:''}${q}</div>
+    <div class="small mute" style="margin-top:2px">點進去先聽語音，再點文字看日文、假名與中文。</div>
+  </a>`;
+}
+function tangoPages(n){ const T = (B.tango||{})[n]; return (T && T.pages) || []; }
+function tangoCropSrc(n, pg){ return `pages/tango/${n}-p${pg}.webp`; }
+function viewTango(n){
+  const T = (B.tango||{})[n], d = DLG['t'+n], L = LESSON[n];
+  if(!T || !d || !L) return viewHome();
+  renderSide(n); reveal = {};
+  current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
+  const pgs = tangoPages(n);
+  const words = d.lines.map((ln,i)=>({ln,i})).filter(x=>x.ln.kind!=='expr');
+  const exprs = d.lines.map((ln,i)=>({ln,i})).filter(x=>x.ln.kind==='expr');
+  const group = (arr) => {
+    let html = '', last = 0;
+    arr.forEach(({ln,i}) => {
+      if(ln.pg && ln.pg !== last){
+        last = ln.pg;
+        html += `<div class="tpg">p.${ln.pg}<button type="button" class="ibtn s tpgbtn" data-act="tangopg" data-n="${n}" data-pg="${ln.pg}" aria-label="看單語表 p.${ln.pg}" title="單語表這頁">📖</button></div>`;
+      }
+      html += tangoRowHTML(d, i);
+    });
+    return html;
+  };
+  $('#view').innerHTML = `
+  <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">第${n}課 ${esc(L.t)}</a> › 單語</div>
+  <h1>第${n}課　單語</h1>
+  <div class="kana">たんご</div>
+  <div class="mute">${esc(L.zh)}・${esc(T.source||'官方單語表')} p.${pgs.length?pgs[0]+'–'+pgs[pgs.length-1]:''}</div>
+  ${playerHTML()}
+  <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
+  <div class="small mute" style="margin:0 0 8px">先聽，再點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 加入複習。📖 可看單語表原頁。</div>
+  <div class="tlist" data-blk>
+    <div class="blkbar">${blkBtn(false)}</div>
+    <h2 class="th2">単語　たんご</h2>
+    ${group(words)}
+    ${exprs.length?`<h2 class="th2">【いろいろな表現】<span class="kana" style="font-weight:400;margin-left:6px">いろいろな ひょうげん</span></h2>${group(exprs)}`:''}
+  </div>
+  <div class="row" style="margin-top:14px"><a class="btn" style="text-decoration:none" href="#/q/t${n}">✏️ 單語聽力測驗</a><a class="btn ghost" style="text-decoration:none" href="#/l/${n}">‹ 回到第${n}課</a></div>`;
+  bindPlayer();
+}
+function tangoRowHTML(d, i){
+  const ln = d.lines[i], key = d.id+':'+i;
+  const lv = (reveal[key]||0);
+  const showKana = S.showKana && ln.kana && ln.kana !== ln.ja;
+  const body = lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
+  return `<div class="line srow trow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
+    <div class="tnum">${esc(ln.lab||String(i+1))}</div>
+    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
+}
+function toggleTangoPage(n, pg){
+  const key = 'tp-'+n+'-'+pg;
+  const open = document.querySelector(`.blkinl[data-for="${key}"]`);
+  const btn = document.querySelector(`.tpgbtn[data-n="${n}"][data-pg="${pg}"]`);
+  if(open){ open.remove(); if(btn){ btn.classList.remove('on'); btn.setAttribute('aria-expanded','false'); } return; }
+  const src = tangoCropSrc(n, pg);
+  const el = document.createElement('div'); el.className = 'blkinl'; el.dataset.for = key;
+  el.innerHTML = `<div class="blkinl-bar"><span>📖 單語表 p.${pg}</span><span class="small mute">點圖放大</span><button class="blkinl-x" data-act="tangopg" data-n="${n}" data-pg="${pg}" aria-label="收起單語表">收起 ✕</button></div>
+    <div class="blkinl-wrap"><img src="${src}" alt="第${n}課單語表 p.${pg}" decoding="async"></div>`;
+  el.addEventListener('click', e => { const im = e.target.closest('.blkinl-wrap img'); if(!im) return; im.classList.toggle('z'); });
+  el.querySelectorAll('img').forEach(im => im.addEventListener('error', () => { if(!im.parentNode.querySelector('.imgoff')) im.insertAdjacentElement('afterend', Object.assign(document.createElement('div'), {className:'imgoff small', textContent:'📴 離線時尚未下載這張單語表，連上網路後再試，或到 ⚙️ 下載全部離線資料。'})); im.remove(); }, {once:true}));
+  const bar = btn && btn.closest('.tpg');
+  (bar || document.querySelector('.tlist')).after(el);
+  if(btn){ btn.classList.add('on'); btn.setAttribute('aria-expanded','true'); }
+  const r = el.getBoundingClientRect(); if(r.bottom > innerHeight) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
 function viewLesson(n){
   const L = LESSON[n]; if(!L) return viewHome();
   renderSide(n); reveal = {};
@@ -327,10 +422,11 @@ function viewLesson(n){
   <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
   ${n?`<h2>🎧 實用會話（依本課文型自編）</h2>
   <div class="dlist">${FLOW[n].filter(d=>!d.drill&&!isText(d)).map(fCard).join('')}</div>`:''}
+  ${B.tango && B.tango[n] ? tangoLessonCard(n) : ''}
   <div class="row" style="margin-top:10px"><a class="btn" style="text-decoration:none" href="#/q/L${n}">✏️ ${lessonLabel(n)} 聽力測驗</a></div>
   ${pagesSection(L)}
   <details ${gs.length<=0?'':''}><summary>📚 ${n?'本課文型':'入門項目'}（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>
-  <div class="row" style="margin-top:14px">${n>0?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n-1}">‹ ${lessonLabel(n-1)}</a>`:''}${n<12?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n+1}">第${n+1}課 ›</a>`:''}</div>`;
+  <div class="row" style="margin-top:14px">${n>0?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n-1}">‹ ${lessonLabel(n-1)}</a>`:''}${n<B.lessons[B.lessons.length-1].n?`<a class="btn ghost" style="text-decoration:none" href="#/l/${n+1}">第${n+1}課 ›</a>`:''}</div>`;
   bindPlayer();
 }
 
@@ -510,7 +606,7 @@ function drillNo(ln){
   if(t[0]==='※') return {pre:'', lab:'※參考'+(t.slice(1).trim()?' '+t.slice(1).trim():'')};
   return null;
 }
-function lineNo(d, i){ const ln = d.lines[i]; if(ln.lab) return {pre:'', lab:ln.lab}; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
+function lineNo(d, i){ const ln = d.lines[i]; if(d.tango) return {pre: ln.kind==='expr' ? 'いろいろな表現' : '單語', lab: ln.lab || String(ln.no||i+1)}; if(ln.lab) return {pre:'', lab:ln.lab}; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
   if(ln.scene) return {pre:'', lab:'課本場景標示'};   // 本文：場景卡片不算句數；其餘一張＝課本一個說話輪次／段落
   return {pre:'', lab:`第${d.lines.slice(0, i+1).filter(l => !l.scene).length}句`}; }
 let PM = null;   // 目前開著的課本頁視窗：{el, mode:'side'|'modal', id, ps, i, zoom, go, zoomTo}
@@ -720,7 +816,7 @@ function rerenderLine(d, i, opts){
   const box = sb ? sb.innerHTML : '';
   const hiddenAgain = S.listenFirst && !(reveal[key]||0);
   if(el.classList.contains('srow')){   // 本文／文型／實用會話: panel is a sibling of the row, keep it
-    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : rowHTML(d, i);
+    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : el.classList.contains('trow') ? tangoRowHTML(d, i) : rowHTML(d, i);
     el.replaceWith(tmp.querySelector('.srow'));
     if(box && hiddenAgain){ closeSrc(key); return; }
     if(box) setIdk(document.querySelector(`.line[data-key="${key}"]`), true);
@@ -772,7 +868,7 @@ function buildQuiz(scope){
   if(scope==='review') items = [...new Set(Object.keys(S.review).concat(Object.keys(S.unf)))].map(k=>{ const [id,i]=k.split(':'); return [DLG[id], +i]; }).filter(x=>x[0]&&x[0].lines[x[1]]);
   else if(scope[0]==='L'){ const n = +scope.slice(1); (n===0 ? FLOW[0] : B.dialogues.filter(d=>d.l===n)).forEach(d=>d.lines.forEach((ln,i)=>items.push([d,i]))); }
   else { const d = DLG[scope]; if(d) d.lines.forEach((ln,i)=>items.push([d,i])); }
-  items = items.filter(([d,i]) => d.lines[i].ja.length >= 4 && !d.lines[i].scene);
+  items = items.filter(([d,i]) => { const ln=d.lines[i]; if(ln.scene) return false; if(d.tango) return !!(ln.ja||ln.kana); return ln.ja.length >= 4; });
   items = shuffle(items).slice(0, scope[0]==='L' ? 10 : 8);
   const pool = B.dialogues.flatMap(d => d.lines.map((ln,i)=>({d,i,ln}))).filter(p => !p.ln.scene);
   return items.map(([d,i], qi) => {
@@ -791,6 +887,7 @@ function viewQuiz(scope){
   if(scope==='review'){ back='#/review'; backName='複習清單'; title='複習測驗'; renderSide('review'); }
   else if(scope[0]==='L'){ const n=+scope.slice(1); back=`#/l/${n}`; backName=lessonLabel(n); title=`${lessonLabel(n)} 聽力測驗`; renderSide(n); }
   else if(DLG[scope] && DLG[scope].drill){ const k=DLG[scope].drill; back=`#/g/${k}`; backName='同文型練習'; title=`${gLabel(k)} 小測驗`; renderSide(DLG[scope].l||1); }
+  else if(DLG[scope] && DLG[scope].tango){ const n=DLG[scope].l; back=`#/t/${n}`; backName=`第${n}課單語`; title=`第${n}課單語測驗`; renderSide(n); }
   else if(DLG[scope]){ back=`#/d/${scope}`; backName=`對話 ${scope}`; title=`${DLG[scope].src?`第${DLG[scope].l}課${DLG[scope].src.label}`:'對話 '+scope}「${DLG[scope].title}」測驗`; renderSide(DLG[scope].l); }
   if(!qs.length){ $('#view').innerHTML = `<div class="crumb"><a href="${back}">‹ ${backName}</a></div><div class="card">沒有可以出題的句子。</div>`; return; }
   Q = {scope, qs, idx:0, score:0, back, backName, title};
@@ -961,7 +1058,7 @@ async function rpRun(){
     s.phase = 'play'; rpDraw();
     const ok = await rpPlayUrl(`audio/${d.id}_${i}`, token);
     if(token!==playToken || RPS!==s) return;
-    if(!ok){ await speakTTS(ln.ja, token); if(token!==playToken || RPS!==s) return; }
+    if(!ok){ await speakTTS(ln.say||ln.ja, token); if(token!==playToken || RPS!==s) return; }
     s.pos++; await wait(450); if(token!==playToken || RPS!==s) return;
   }
   if(RPS===s){ s.phase = 'done'; rpDraw(); }
@@ -1032,6 +1129,7 @@ document.addEventListener('click', e => {
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
   else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(innerWidth < SIDE_MIN || b.classList.contains('blkinl-x')) toggleBlkInline(d, +b.dataset.i); else if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
+  else if(act==='tangopg'){ toggleTangoPage(+b.dataset.n, +b.dataset.pg); }
   else if(act==='got'){ if(window.SyncMerge) SyncMerge.tomb(S,'review',b.dataset.k); delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
 $('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
@@ -1056,6 +1154,7 @@ async function audioList(){
   const L = [], add = b => L.push(b + '.mp3', b + '_s.mp3');
   B.dialogues.concat(Object.values(SPLITD), Object.values(DRILL), Object.values(SITUD)).forEach(d => d.lines.forEach((_, i) => add(`audio/${d.id}_${i}`)));
   Object.keys(B.vocab).forEach((_, n) => add(`audio/w_${n}`));
+  Object.keys(B.tango || {}).forEach(n => { const T = B.tango[n]; (T.lines||[]).forEach((_, i) => add(`audio/t${n}_${i}`)); });
   Object.entries(window.RP || {}).forEach(([did, m]) => Object.entries(m).forEach(([i, v]) => v[1].forEach((_, a) => add(`audio/${did}-r_${i}_${a}`))));
   return [...new Set(L)];
 }
@@ -1063,11 +1162,12 @@ async function audioList(){
 const PAGES_CACHE = 'nh-pages-v1';   // 與 sw.js 的 PAGES 相同
 function imageList(){ const L = []; for(let p = BOOKL.pages[0]; p <= BOOKL.pages[1]; p++) L.push(pageSrc(p));
   Object.values(window.SEC || {}).forEach(es => es.forEach(e => L.push('pages/sec/' + e[0])));
-  Object.values(window.BLK || {}).forEach(bs => bs.forEach(b => b[1].forEach(e => L.push('pages/' + e[0])))); return [...new Set(L)]; }
+  Object.values(window.BLK || {}).forEach(bs => bs.forEach(b => b[1].forEach(e => L.push('pages/' + e[0]))));
+  Object.entries(B.tango || {}).forEach(([n, T]) => (T.pages||[]).forEach(pg => L.push(`pages/tango/${n}-p${pg}.webp`))); return [...new Set(L)]; }
 const relKey = (u, re) => { try{ const m = new URL(u, location.href).pathname.match(re); return m ? m[1] : null; }catch(e){ return null; } };
 const OFF = {
   audio: {name: AUDIO_CACHE, list: audioList, re: /\/(audio\/[^/]+\.mp3)$/, old: /^nh-audio-/},
-  img:   {name: PAGES_CACHE, list: async () => imageList(), re: /\/(pages\/(?:p\d+|sec\/[^/]+)\.webp)$/, old: /^nh-pages-/},
+  img:   {name: PAGES_CACHE, list: async () => imageList(), re: /\/(pages\/(?:p\d+|(?:sec|blk|tango)\/[^/]+)\.webp)$/, old: /^nh-pages-/},
 };
 // 只算清單內的；prune 時順便清掉舊版快取、清單外的舊檔、重複的（不同網址寫法）
 async function offScan(kind, prune){
@@ -1124,7 +1224,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.12（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.13（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -1163,6 +1263,9 @@ function buildIndex(){
   const firstUse = {}; B.dialogues.forEach(d => d.lines.forEach((ln, i) => (ln.v||[]).forEach(w => { if(!firstUse[w]) firstUse[w] = [d, i]; })));
   Object.entries(B.vocab).forEach(([w, v], vn) => { const f = firstUse[w];
     I.push(sqItem({t: '單字', l: v.l, ja: w, kana: v.r, zh: v.zh, who: '', pg: null, src: vLabel(w), href: f ? '#/d/'+f[0].id : (LESSON[v.l] ? '#/l/'+v.l : '#/'), key: f ? f[0].id+':'+f[1] : null, au: `audio/w_${vn}`})); });
+  Object.entries(B.tango || {}).forEach(([n, T]) => { const d = DLG['t'+n]; if(!d) return;
+    d.lines.forEach((ln, i) => I.push(sqItem({t:'單語', l:+n, ja:ln.ja, kana:ln.kana, zh:ln.zh, who:'', pg:ln.pg||null, src:`第${n}課單語`+(ln.pg?` p.${ln.pg}`:''), href:`#/t/${n}`, key:d.id+':'+i, au:`audio/${d.id}_${i}`}))); });
+
   SIDX = I; return I;
 }
 function addRPIndex(){ if(SIDX_RP || !window.RP || !SIDX) return; SIDX_RP = true;
@@ -1247,6 +1350,7 @@ function renderRoute(){
   const h = location.hash.replace(/^#\/?/, '');
   const [a, b] = h.split('/');
   if(a==='l') viewLesson(+b);
+  else if(a==='t') viewTango(+b);
   else if(a==='d') viewDialogue(b);
   else if(a==='q') viewQuiz(b);
   else if(a==='g') viewDrill(b);

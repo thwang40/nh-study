@@ -560,3 +560,24 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .sync-card .sync-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .sync-btn-login{width:100%;justify-content:center;display:flex;align-items:center;gap:6px;font-weight:700}
 .sync-err{color:var(--alert);font-size:12px;margin-top:6px}
+
+/* 第12課單語（聽力優先）；沿用 .srow 左方 不熟 勾選 */
+.tango-card{margin:8px 0 12px}
+.tango-card .ltitle{font-weight:800;margin:2px 0}
+.th2{font-size:18px;margin:16px 0 8px;color:var(--teal);display:flex;align-items:baseline;flex-wrap:wrap;gap:4px}
+.tpg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);margin:10px 0 4px;padding-top:6px;border-top:1px dashed var(--line)}
+.tlist .tpg:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.srow.trow{grid-template-columns:28px minmax(0,1fr) auto;align-items:start;padding-top:8px;padding-bottom:8px;border-radius:0;border-bottom:1px solid var(--line)}
+.srow.trow + .srow.trow{margin-top:0}
+.trow .tnum{font-weight:800;color:var(--teal);font-size:14px;text-align:right;padding-top:10px}
+.srow.trow .stext{min-height:44px;display:flex;flex-direction:column;justify-content:center}
+.srow.trow .stext .ja{font-size:20px;font-weight:700;line-height:1.35;text-indent:0}
+.srow.trow .stext .kana{font-size:14px;color:var(--mute)}
+.srow.trow .stext .zh{font-size:15px;margin-top:2px}
+.tlist{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px 12px}
+@media (max-width:560px){
+  .srow.trow{grid-template-columns:28px minmax(0,1fr) auto;align-items:center;column-gap:8px}
+  .srow.trow .tnum{grid-column:1;grid-row:1}
+  .srow.trow .stext{grid-column:2;grid-row:1;min-height:36px}
+   .srow.trow .sbtns{grid-column:3;grid-row:1;align-self:start;padding-top:4px}
+}
