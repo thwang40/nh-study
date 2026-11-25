@@ -377,11 +377,81 @@ function viewTango(n){
   <div class="row" style="margin-top:14px"><a class="btn" style="text-decoration:none" href="#/q/t${n}">✏️ 單語聽力測驗</a><a class="btn ghost" style="text-decoration:none" href="#/l/${n}">‹ 回到第${n}課</a></div>`;
   bindPlayer();
 }
+function moraeOf(s){
+  const small = 'ゃゅょャュョぁぃぅぇぉァィゥェォ';
+  const out = [];
+  for(const ch of s){ if(out.length && small.includes(ch)) out[out.length-1] += ch; else out.push(ch); }
+  return out;
+}
+function isMoraTok(t){ return /^[ぁ-ゔァ-ヴー]/.test(t); }
+function kanaTokens(s){
+  const small = 'ゃゅょャュョぁぃぅぇぉァィゥェォ';
+  const out = [];
+  for(const ch of s){
+    if(out.length && small.includes(ch) && isMoraTok(out[out.length-1])) out[out.length-1] += ch;
+    else out.push(ch);
+  }
+  return out;
+}
+/* 單語表音高：上線標高音拍，右端下鉤表示後面下降（平板＝第 1 拍低、其後高且無下鉤） */
+function pitchHTML(kana, acc, pk){
+  if(!kana) return '';
+  if(acc==null || acc==='') return esc(kana);
+  if(Array.isArray(acc)){
+    const parts = String(kana).split(/[／/]/);
+    const pks = Array.isArray(pk) ? pk : [];
+    return parts.map((p, i) => pitchHTML(p, acc[i], pks[i])).join('／');
+  }
+  const toks = kanaTokens(String(kana));
+  const moraIdx = [];
+  toks.forEach((tok, i) => { if(isMoraTok(tok)) moraIdx.push(i); });
+  let targets = moraIdx;
+  if(pk){
+    const pkm = moraeOf(pk);
+    const moraToks = moraIdx.map(i => toks[i]);
+    let start = -1;
+    for(let i = 0; i <= moraToks.length - pkm.length; i++){
+      if(moraToks.slice(i, i + pkm.length).join('') === pkm.join('')){ start = i; break; }
+    }
+    if(start >= 0) targets = moraIdx.slice(start, start + pkm.length);
+  }
+  const n = targets.length, accN = +acc;
+  const high = new Set(), drop = new Set();
+  if(n){
+    if(accN === 0){ for(let i = 1; i < n; i++) high.add(targets[i]); }
+    else if(accN === 1){ high.add(targets[0]); drop.add(targets[0]); }
+    else {
+      const lastHigh = Math.min(accN, n) - 1;
+      for(let i = 1; i <= lastHigh; i++) high.add(targets[i]);
+      drop.add(targets[lastHigh]);
+    }
+  }
+  let html = '', i = 0;
+  while(i < toks.length){
+    if(high.has(i)){
+      let j = i, hasDrop = false, k = i;
+      while(k < toks.length){
+        if(high.has(k)){ j = k; if(drop.has(k)) hasDrop = true; k++; }
+        else if(!isMoraTok(toks[k])){
+          let p = k + 1;
+          while(p < toks.length && !isMoraTok(toks[p])) p++;
+          if(p < toks.length && high.has(p)) k = p;
+          else break;
+        } else break;
+      }
+      html += `<span class="phibar${hasDrop?' drop':''}">${esc(toks.slice(i, j + 1).join(''))}</span>`;
+      i = j + 1;
+    } else { html += esc(toks[i]); i++; }
+  }
+  return html;
+}
 function tangoRowHTML(d, i){
   const ln = d.lines[i], key = d.id+':'+i;
   const lv = (reveal[key]||0);
   const showKana = S.showKana && ln.kana && ln.kana !== ln.ja;
-  const body = lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
+  const jaHTML = (ln.kana && ln.kana === ln.ja) ? pitchHTML(ln.ja, ln.acc, ln.pk) : esc(ln.ja);
+  const kanaHTML = showKana ? pitchHTML(ln.kana, ln.acc, ln.pk) : '';
+  const body = lv>=1 ? `<div class="ja">${jaHTML}</div>${kanaHTML?`<div class="kana">${kanaHTML}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
   return `<div class="line srow trow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tnum">${esc(ln.lab||String(i+1))}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
@@ -1224,7 +1294,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.13（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.14（可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
