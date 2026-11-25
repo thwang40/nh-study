@@ -565,9 +565,9 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .tango-card{margin:8px 0 12px}
 .tango-card .ltitle{font-weight:800;margin:2px 0}
 .th2{font-size:18px;margin:16px 0 8px;color:var(--teal);display:flex;align-items:baseline;flex-wrap:wrap;gap:4px}
-.tpg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);margin:10px 0 4px;padding-top:6px;border-top:1px dashed var(--line)}
-.tlist .tpg:first-of-type{border-top:0;padding-top:0;margin-top:0}
-.srow.trow{grid-template-columns:28px minmax(0,1fr) auto;align-items:start;padding-top:8px;padding-bottom:8px;border-radius:0;border-bottom:1px solid var(--line)}
+.tpg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);margin:14px 2px 8px;padding-top:0;border-top:0}
+.tlist .tpg:first-of-type{margin-top:4px}
+.srow.trow{grid-template-columns:32px minmax(0,1fr) auto;align-items:start;padding-top:8px;padding-bottom:8px;border-radius:0;border-bottom:0}
 .srow.trow + .srow.trow{margin-top:0}
 .trow .tnum{font-weight:800;color:var(--teal);font-size:14px;text-align:right;padding-top:10px}
 .srow.trow .stext{min-height:44px;display:flex;flex-direction:column;justify-content:center}
@@ -575,14 +575,13 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .srow.trow .stext .kana{font-size:14px;color:var(--mute);margin-top:6px;padding-top:3px}
 .srow.trow .stext .zh{font-size:15px;margin-top:2px}
 .srow.trow .stext .ja{word-break:keep-all;overflow-wrap:break-word}
-.tlist{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px 12px}
+.tlist{background:transparent;border:0;border-radius:0;padding:0}
 @media (max-width:560px){
-  .srow.trow{grid-template-columns:28px minmax(0,1fr) auto;align-items:start;column-gap:8px}
+  .srow.trow{grid-template-columns:32px minmax(0,1fr) auto;align-items:start;column-gap:6px}
   .srow.trow .tnum{grid-column:1;grid-row:1;align-self:start;padding-top:10px}
   .srow.trow .stext{grid-column:2;grid-row:1;min-height:36px}
   .srow.trow .sbtns{grid-column:3;grid-row:1;align-self:start;padding-top:4px}
 }
-.srow.exrow .tnum{padding-top:16px}
 .srow.exrow .stext .ja{overflow-wrap:break-word;word-break:keep-all}
 
 /* 單語表音高記號（上線＝高音拍，右端下鉤＝後面下降） */
@@ -592,17 +591,37 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .srow.trow .stext .kana .phibar{border-color:#555}
 
 
-/* 第12課單語例句 */
+/* 第12課單語：一詞一組卡片，句子縮在單語底下 */
 .texopt{display:inline-flex;align-items:center;gap:6px;font-size:13px;user-select:none;margin-left:2px}
 .texopt input{accent-color:var(--teal)}
-.tlist .blkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-details.tex{margin:0 0 4px;padding:0 0 6px 4px}
-details.tex > summary{cursor:pointer;font-size:13px;color:var(--teal);padding:4px 0 6px;list-style:none;user-select:none;font-weight:600}
-details.tex > summary::-webkit-details-marker{display:none}
-details.tex > summary::before{content:"▸ ";}
-details.tex[open] > summary::before{content:"▾ ";}
-.srow.exrow .tnum{color:var(--mute);font-weight:600;font-size:12px;padding-top:12px}
-.srow.exrow .stext .ja{font-size:18px;font-weight:500;line-height:1.55}
+.tlist .blkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px}
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:0 0 12px;overflow:hidden;box-shadow:0 1px 2px #0000000d}
+.tcard .twd{background:var(--pale);border:0;border-radius:0;box-shadow:inset 4px 0 0 var(--pri);padding-top:10px;padding-bottom:10px}
+.tcard .twd .tnum{font-size:18px;font-weight:800;color:var(--teal);padding-top:8px}
+.tcard .twd.playing{box-shadow:inset 4px 0 0 var(--pri),0 0 0 3px #1d643422}
+.tcard .twd.unf:not(.playing){background:rgba(240,170,60,.22);box-shadow:inset 4px 0 0 #e6a23c}
+.tcard.tcard-expr .twd{background:#fff;box-shadow:inset 4px 0 0 var(--gold)}
+.tcard.tcard-expr .twd.unf:not(.playing){background:rgba(240,170,60,.22);box-shadow:inset 4px 0 0 #e6a23c}
+.texchev{width:36px;height:36px;border:0;background:transparent;color:var(--teal);display:inline-grid;place-items:center;border-radius:8px;flex:none;padding:0}
+.texchev::before{content:"▸";font-size:16px;line-height:1;display:block;transition:transform .15s}
+.tcard:has(details.tex[open]) .texchev::before,.texchev[aria-expanded="true"]::before{transform:rotate(90deg)}
+.texchev:hover,.texchev:focus-visible{background:#01343814}
+details.tex{margin:0;padding:0;background:#f4f7f2;border-top:1px solid var(--line)}
+details.tex > summary.texsr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.texlines{padding:6px 8px 8px}
+.tcard .exrow{background:#fbfcf9;border:0;border-left:3px solid var(--pale2);border-radius:8px;margin:4px 0 4px 10px;padding-top:6px;padding-bottom:6px;box-shadow:none}
+.tcard .exrow.playing{box-shadow:0 0 0 2px #1d643455;border-left-color:var(--pri)}
+.tcard .exrow.unf:not(.playing){background:rgba(240,170,60,.14);box-shadow:none;border-left-color:#e6a23c}
+.srow.exrow .tnum{color:var(--mute);font-weight:600;font-size:15px;padding-top:10px;letter-spacing:0}
+.srow.exrow .stext .ja{font-size:16px;font-weight:500;line-height:1.55}
+.srow.exrow .stext .kana{font-size:13px}
+.srow.exrow .stext .zh{font-size:14px}
+.srow.exrow .stext{min-height:36px}
 .srow.exrow .stext .ja .tw, .line .ja .tw{color:var(--alert);font-weight:700;background:none}
 .srow.exrow .stext .ja ruby{ruby-position:over}
 .srow.exrow .stext .ja rt{font-size:10px;color:var(--mute);font-weight:400}
+@media (max-width:560px){
+  .tcard .twd .tnum{font-size:16px;padding-top:6px}
+  .tcard .exrow{margin-left:6px}
+  .texchev{width:32px;height:32px}
+}

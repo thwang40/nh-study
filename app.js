@@ -124,7 +124,7 @@ function setPlaying(key){
   curPlaying = key;
   document.querySelectorAll('.line.playing,.dline.playing').forEach(e=>e.classList.remove('playing'));
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
-  if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); const dt = el && el.closest('details'); if(dt && !dt.open) dt.open = true; if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
+  if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); const dt = el && el.closest('details'); if(dt && !dt.open) dt.open = true; const card = el && el.closest('.tcard'); if(card){ syncTexChev(card); syncTexAllBtn(); } if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
   const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.tangoEx ? `第${d.l}課 單語例句` : d.tango ? `第${d.l}課 單語 p.${d.lines[+i]&&d.lines[+i].pg||''}` : d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
 }
@@ -396,8 +396,10 @@ function viewTango(n){
         last = ln.pg;
         html += `<div class="tpg">p.${ln.pg}<button type="button" class="ibtn s tpgbtn" data-act="tangopg" data-n="${n}" data-pg="${ln.pg}" aria-label="看單語表 p.${ln.pg}" title="單語表這頁">📖</button></div>`;
       }
+      html += `<div class="tcard${ln.kind==='expr'?' tcard-expr':''}">`;
       html += tangoRowHTML(d, i);
       if(ln.kind !== 'expr') html += tangoExBlockHTML(n, ln.no);
+      html += `</div>`;
     });
     return html;
   };
@@ -409,7 +411,7 @@ function viewTango(n){
   ${playerHTML()}
   <div class="row" style="margin:-2px 0 8px"><label class="texopt"><input type="checkbox" id="tangoExPlayCb" ${S.tangoExPlay!==false?'checked':''}> 含例句（單語＋3 句）</label></div>
   <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
-  <div class="small mute" style="margin:0 0 8px">先聽，再點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文、第 3 次再隱藏。每個單語下面有 3 句例句，預設收合。全部播放預設會先播單語再播它的例句，可取消「含例句」。🔊 播放　🔁 重複三次　🙋 加入複習。📖 可看單語表原頁。</div>
+  <div class="small mute" style="margin:0 0 8px">先聽，再點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文、第 3 次再隱藏。每個單語自成一組，右邊箭頭可展開底下的聽力句子（預設收合）。全部播放預設會先播單語再播它的句子，可取消「含例句」。🔊 播放　🔁 重複三次　🙋 加入複習。📖 可看單語表原頁。</div>
   <div class="tlist" data-blk>
     <div class="blkbar">${blkBtn(false)}<button class="btn sm ghost" data-act="texall">展開全部例句</button></div>
     <h2 class="th2">単語　たんご</h2>
@@ -505,9 +507,10 @@ function tangoExRowHTML(d, i){
   const ln = d.lines[i], key = d.id+':'+i;
   const lv = (reveal[key]||0);
   const ja = ln.furi ? furiHTML(ln.furi) : esc(ln.ja);
+  const circ = ['','①','②','③'];
   const body = lv>=1 ? `<div class="ja">${ja}</div>${S.showKana&&ln.kana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
   return `<div class="line srow trow exrow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
-    <div class="tnum">${esc(String(ln.ex||((i%3)+1)))}</div>
+    <div class="tnum">${esc(circ[ln.ex]||String(ln.ex||((i%3)+1)))}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
     <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
@@ -517,7 +520,34 @@ function tangoExBlockHTML(n, wordNo){
   if(!ed) return '';
   const idxs = ed.lines.map((ln,i) => ln.w===wordNo ? i : -1).filter(i => i>=0);
   if(!idxs.length) return '';
-  return `<details class="tex"><summary>例句 ${idxs.length}</summary><div class="texlines">${idxs.map(i => tangoExRowHTML(ed, i)).join('')}</div></details>`;
+  return `<details class="tex"><summary class="texsr">聽力句子</summary><div class="texlines">${idxs.map(i => tangoExRowHTML(ed, i)).join('')}</div></details>`;
+}
+function tangoHasEx(d, ln){
+  if(!d || !ln || ln.kind==='expr') return false;
+  const ed = DLG['t'+d.l+'e'];
+  return !!(ed && ed.lines.some(el => el.w === ln.no));
+}
+function texCardOpen(key){
+  const el = document.querySelector(`.line[data-key="${key}"]`);
+  const dt = el && el.closest('.tcard') && el.closest('.tcard').querySelector('details.tex');
+  return !!(dt && dt.open);
+}
+function syncTexChev(card){
+  if(!card) return;
+  const dt = card.querySelector('details.tex');
+  const btn = card.querySelector('.texchev');
+  if(!btn) return;
+  const on = !!(dt && dt.open);
+  btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  btn.setAttribute('aria-label', on ? '收合句子' : '展開句子');
+  btn.title = on ? '收合句子' : '展開句子';
+}
+function syncTexAllBtn(){
+  const b = document.querySelector('[data-act="texall"]');
+  if(!b) return;
+  const dts = [...document.querySelectorAll('.tlist details.tex')];
+  const allOpen = dts.length && dts.every(d => d.open);
+  b.textContent = allOpen ? '收合全部例句' : '展開全部例句';
 }
 function tangoRowHTML(d, i){
   const ln = d.lines[i], key = d.id+':'+i;
@@ -526,10 +556,13 @@ function tangoRowHTML(d, i){
   const jaHTML = (ln.kana && ln.kana === ln.ja) ? pitchHTML(ln.ja, ln.acc, ln.pk) : esc(ln.ja);
   const kanaHTML = showKana ? pitchHTML(ln.kana, ln.acc, ln.pk) : '';
   const body = lv>=1 ? `<div class="ja">${jaHTML}</div>${kanaHTML?`<div class="kana">${kanaHTML}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
-  return `<div class="line srow trow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
+  const hasEx = tangoHasEx(d, ln);
+  const open = hasEx && texCardOpen(key);
+  const chev = hasEx ? `<button type="button" class="texchev" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"></button>` : '';
+  return `<div class="line srow trow twd${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tnum">${esc(ln.lab||String(i+1))}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${chev}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function toggleTangoPage(n, pg){
@@ -867,7 +900,8 @@ function blkBtn(on){ return `<button class="bshow${on?' on':''}" data-act="bshow
 function blockShow(b){
   const box = b.closest('[data-blk]'); if(!box) return; const on = !b.classList.contains('on');
   if(box.tagName==='DETAILS' && on) box.open = true;
-  box.querySelectorAll('details.tex').forEach(dt => { dt.open = on; });
+  box.querySelectorAll('details.tex').forEach(dt => { dt.open = on; const c = dt.closest('.tcard'); if(c) syncTexChev(c); });
+  syncTexAllBtn();
   const mine = el => el.parentElement.closest('[data-blk]') === box;
   [...box.querySelectorAll('.line[data-key]')].filter(mine).forEach(el => { const k = el.dataset.key, [id, i] = k.split(':');
     reveal[k] = on ? 2 : 0; if(!on) closeSrc(k); rerenderLine(DLG[id], +i, {}); });
@@ -1280,7 +1314,8 @@ document.addEventListener('click', e => {
   else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(innerWidth < SIDE_MIN || b.classList.contains('blkinl-x')) toggleBlkInline(d, +b.dataset.i); else if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='tangopg'){ toggleTangoPage(+b.dataset.n, +b.dataset.pg); }
-  else if(act==='texall'){ const box = b.closest('.tlist') || document; const dts = [...box.querySelectorAll('details.tex')]; const open = dts.some(d => !d.open); dts.forEach(d => d.open = open); b.textContent = open ? '收合全部例句' : '展開全部例句'; }
+  else if(act==='texall'){ const box = b.closest('.tlist') || document; const dts = [...box.querySelectorAll('details.tex')]; const open = dts.some(d => !d.open); dts.forEach(d => { d.open = open; const c = d.closest('.tcard'); if(c) syncTexChev(c); }); syncTexAllBtn(); }
+  else if(act==='texone'){ e.preventDefault(); const card = b.closest('.tcard'); const dt = card && card.querySelector('details.tex'); if(dt){ dt.open = !dt.open; syncTexChev(card); syncTexAllBtn(); } }
   else if(act==='got'){ if(window.SyncMerge) SyncMerge.tomb(S,'review',b.dataset.k); delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
 $('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
@@ -1376,7 +1411,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.15（第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.16（第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
