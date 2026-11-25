@@ -577,14 +577,32 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
 .srow.trow .stext .ja{word-break:keep-all;overflow-wrap:break-word}
 .tlist{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px 12px}
 @media (max-width:560px){
-  .srow.trow{grid-template-columns:28px minmax(0,1fr) auto;align-items:center;column-gap:8px}
-  .srow.trow .tnum{grid-column:1;grid-row:1}
+  .srow.trow{grid-template-columns:28px minmax(0,1fr) auto;align-items:start;column-gap:8px}
+  .srow.trow .tnum{grid-column:1;grid-row:1;align-self:start;padding-top:10px}
   .srow.trow .stext{grid-column:2;grid-row:1;min-height:36px}
-   .srow.trow .sbtns{grid-column:3;grid-row:1;align-self:start;padding-top:4px}
+  .srow.trow .sbtns{grid-column:3;grid-row:1;align-self:start;padding-top:4px}
 }
+.srow.exrow .tnum{padding-top:16px}
+.srow.exrow .stext .ja{overflow-wrap:break-word;word-break:keep-all}
 
 /* 單語表音高記號（上線＝高音拍，右端下鉤＝後面下降） */
 .phibar{display:inline-block;position:relative;border-top:2px solid #2a2a2a;line-height:1.25;padding:2px 0 0;margin-top:0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .phibar.drop::after{content:"";position:absolute;right:0;top:0;height:.5em;border-right:2px solid #2a2a2a}
 .srow.trow .stext .ja .phibar{border-color:#222}
 .srow.trow .stext .kana .phibar{border-color:#555}
+
+
+/* 第12課單語例句 */
+.texopt{display:inline-flex;align-items:center;gap:6px;font-size:13px;user-select:none;margin-left:2px}
+.texopt input{accent-color:var(--teal)}
+.tlist .blkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+details.tex{margin:0 0 4px;padding:0 0 6px 4px}
+details.tex > summary{cursor:pointer;font-size:13px;color:var(--teal);padding:4px 0 6px;list-style:none;user-select:none;font-weight:600}
+details.tex > summary::-webkit-details-marker{display:none}
+details.tex > summary::before{content:"▸ ";}
+details.tex[open] > summary::before{content:"▾ ";}
+.srow.exrow .tnum{color:var(--mute);font-weight:600;font-size:12px;padding-top:12px}
+.srow.exrow .stext .ja{font-size:18px;font-weight:500;line-height:1.55}
+.srow.exrow .stext .ja .tw, .line .ja .tw{color:var(--alert);font-weight:700;background:none}
+.srow.exrow .stext .ja ruby{ruby-position:over}
+.srow.exrow .stext .ja rt{font-size:10px;color:var(--mute);font-weight:400}
