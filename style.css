@@ -931,6 +931,16 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .tcard.has-exrev:has(details.tex[open]){border-right-width:1px}
 @media (max-width:560px){
   .texchev{min-width:44px;height:40px;padding:0 8px 0 6px}
-  .tlist.timg-sm .srow.trow.twd .sbtns{flex-wrap:wrap;justify-content:flex-end;max-width:150px;row-gap:4px}
 }
 .tcard.has-exrev .twd .sbtns{opacity:1}
+
+/* v3.38 「例句」按鈕（＋待複習）放在單語文字右邊，窄的時候換到文字下方、靠左 */
+.srow.trow.twd .twmain{display:flex;flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:4px;min-width:0}
+.srow.trow.twd .twmain .stext{flex:0 1 auto;min-width:0;max-width:100%}
+.texctl{display:inline-flex;align-items:center;gap:4px;flex:none}
+.texctl .texchev,.texctl .texrevb{margin-left:0}
+@media (max-width:560px){
+  .srow.trow.twd .twmain{grid-column:2;grid-row:1;align-self:start;padding-top:2px}
+  .tlist.timg-md .srow.trow.twd .twmain,
+  .tlist.timg-lg .srow.trow.twd .twmain{grid-column:2;grid-row:1}
+}

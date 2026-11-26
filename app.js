@@ -717,15 +717,15 @@ function tangoRowHTML(d, i){
   const hasEx = tangoHasEx(d, ln);
   const open = hasEx && texCardOpen(key);
   const revC = hasEx ? texRevCount(d.l, ln.no) : 0;
-  const chev = hasEx ? `${texRevBadgeHTML(revC)}<button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>` : '';
+  const chev = hasEx ? `<span class="texctl"><button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>${texRevBadgeHTML(revC)}</span>` : '';
   const src = tangoImgSrc(d, i);
   const imgOpen = !!tangoImgOpen[key];
   const imgBtn = src ? `<button type="button" class="timg${imgOpen?' on':''}" data-act="tangoimg" data-k="${key}" aria-expanded="${imgOpen?'true':'false'}" aria-label="放大插圖" title="點一下放大"><img src="${src}" alt="" decoding="async" width="160" height="160" onerror="const b=this.closest('.timg'); if(b) b.hidden=true; const x=document.getElementById('timg-${key.replace(':','_')}'); if(x) x.remove();"></button>` : '';
   const imgBox = src ? `<div class="timgbox${imgOpen?' open':''}" id="timg-${key.replace(':','_')}" data-for="${key}"><img src="${src}" alt="" decoding="async" data-act="tangoimg" data-k="${key}"></div>` : '';
   return `<div class="line srow trow twd${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tleft"><div class="tnum">${esc(ln.lab||String(i+1))}</div>${imgBtn}</div>
-    <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${chev}</div>
+    <div class="twmain"><div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>${chev}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>${imgBox}`;
 }
 function toggleTangoPage(n, pg){
@@ -1829,7 +1829,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.37（單語卡片改名、例句箭頭加大、收合時顯示「待複習」句數）</div>
+  <div class="foot">版本 3.38（單語「例句」按鈕移到單語文字右邊）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
