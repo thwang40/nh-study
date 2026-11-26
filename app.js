@@ -115,8 +115,9 @@ function registerTangoEx(){
 registerTangoEx();
 /* 綜合聽力測驗（v3.26）：句庫 BOOK.mix（mix.js）→ 虛擬對話 mx，音檔 audio/mx_<i>.mp3，複習 key mx:<i>（append-only，走既有同步） */
 const MIX = B.mix || [];
+const MIX_LV = {e:'簡單', m:'中等', h:'難'};
 if(MIX.length) DLG.mx = {id:'mx', l:0, mix:true, title:'綜合聽力測驗', scene:'', sp:{A:{name:'綜合', voice:'f'}},
-  lines: MIX.map((x, i) => ({s:'A', ja:x.ja, furi:x.furi, kana:x.kana, zh:x.zh, say:x.say, g:x.g||[], v:[], mx:x, lab:`${x.l?`第${x.l}課`:'入門'}程度・#${i+1}`}))};
+  lines: MIX.map((x, i) => ({s:'A', ja:x.ja, furi:x.furi, kana:x.kana, zh:x.zh, say:x.say, g:x.g||[], v:[], mx:x, lab:`${x.l?`第${x.l}課`:'入門'}・${MIX_LV[x.lv]||'中等'}・#${i+1}`}))};
 // 課本頁序：每課依課本頁面順序交錯排列「本文」與「文型」，同一頁先出現者在前；實用會話（自編）放最後
 const GFIRST = {'1-3':1, '7-5':1, '15-3':1, '15-4':1}; // 這兩頁課本是「文型」印在「本文」上面（p.26、p.93）
 function flowOf(n){
@@ -1196,12 +1197,13 @@ function viewReview(){
    選課（單選／複選／連選）→ 從句庫 BOOK.mix 挑「本句所屬課（最新用到的課）」在所選範圍內的句子 → 一句一句先聽再看。
    選課與題數存在 nhStudy.mixPref（獨立，不寫入 bunkaListen.v2）；「我不會」照舊寫入複習清單（key mx:<i>，會同步）。 */
 const MIX_PREF_KEY = 'nhStudy.mixPref';
-function mixPref(){ try{ const o = JSON.parse(localStorage.getItem(MIX_PREF_KEY)||'{}') || {}; return {sel: Array.isArray(o.sel) ? o.sel.filter(n => LESSON[n]) : [], n: [10,20,0].includes(o.n) ? o.n : 10}; }catch(e){ return {sel:[], n:10}; } }
-function saveMixPref(){ try{ localStorage.setItem(MIX_PREF_KEY, JSON.stringify({sel:[...MXP.sel].sort((a,b)=>a-b), n:MXP.n})); }catch(e){} }
+function mixPref(){ try{ const o = JSON.parse(localStorage.getItem(MIX_PREF_KEY)||'{}') || {}; return {sel: Array.isArray(o.sel) ? o.sel.filter(n => LESSON[n]) : [], n: [10,20,0].includes(o.n) ? o.n : 10, lv: MIX_LV[o.lv] ? o.lv : 'm'}; }catch(e){ return {sel:[], n:10, lv:'m'}; } }
+function saveMixPref(){ try{ localStorage.setItem(MIX_PREF_KEY, JSON.stringify({sel:[...MXP.sel].sort((a,b)=>a-b), n:MXP.n, lv:MXP.lv})); }catch(e){} }
 let MXP = null;  // 選課畫面 {sel:Set, anchor, rangeMode, last, n}
 let MX = null;   // 測驗中 {key, sel, order, pos, idk:Set, done}
-const mixCount = l => MIX.filter(x => x.l===l).length;
-const mixLessons = () => B.lessons.filter(l => mixCount(l.n));
+const mixLv = () => (MXP && MXP.lv) || 'm';
+const mixCount = (l, lv) => MIX.filter(x => x.l===l && (x.lv||'m')===(lv||mixLv())).length;
+const mixLessons = () => B.lessons.filter(l => MIX.some(x => x.l===l.n));
 const lsName = n => n===0 ? '入門' : `第${n}課`;
 function selEncode(arr){ const a = [...new Set(arr)].sort((x,y)=>x-y), out = [];
   for(let i = 0; i < a.length;){ let j = i; while(j+1 < a.length && a[j+1]===a[j]+1) j++; out.push(j > i+1 ? `${a[i]}-${a[j]}` : j===i+1 ? `${a[i]},${a[j]}` : `${a[i]}`); i = j+1; }
@@ -1212,16 +1214,18 @@ function selDecode(str){ const out = new Set();
   return [...out].sort((x,y)=>x-y); }
 function selLabel(arr){ if(!arr.length) return '尚未選課';
   return selEncode(arr).split(',').map(p => { const [a,b] = p.split('-').map(Number); return b!=null ? `${lsName(a)}～${lsName(b)}` : lsName(a); }).join('・'); }
-function mixPool(sel){ const S2 = new Set(sel); return MIX.map((_,i)=>i).filter(i => S2.has(MIX[i].l)); }
+function mixPool(sel, lv){ const S2 = new Set(sel); lv = lv || mixLv(); return MIX.map((_,i)=>i).filter(i => S2.has(MIX[i].l) && (MIX[i].lv||'m')===lv); }
 /* 各課輪流取句（每課都會出到），再打散順序 */
-function mixBuildOrder(sel, n){ const by = {};
-  shuffle(mixPool(sel)).forEach(i => (by[MIX[i].l] = by[MIX[i].l] || []).push(i));
+function mixBuildOrder(sel, n, lv){ const by = {};
+  shuffle(mixPool(sel, lv)).forEach(i => (by[MIX[i].l] = by[MIX[i].l] || []).push(i));
   const ls = shuffle(Object.keys(by)), out = []; let more = true;
   while(more){ more = false; for(const l of ls){ if(by[l].length){ out.push(by[l].shift()); more = true; } } }
   return shuffle(n ? out.slice(0, n) : out); }
+const MIX_LV_DESC = {e:'短句、一個子句、常用單字、ます形', m:'一般長度的句子，組合單語與文型', h:'較長的句子或兩句連在一起，變化與文型較多'};
+const mixKey = (sel, lv) => selEncode(sel) + (lv && lv!=='m' ? '@' + lv : '');
 function viewMixPick(){
   renderSide('mix'); current = null;
-  if(!MXP){ const p = mixPref(); MXP = {sel:new Set(p.sel), anchor:null, rangeMode:false, last:null, n:p.n}; }
+  if(!MXP){ const p = mixPref(); MXP = {sel:new Set(p.sel), anchor:null, rangeMode:false, last:null, n:p.n, lv:p.lv}; }
   drawMixPick();
 }
 function drawMixPick(){
@@ -1236,39 +1240,43 @@ function drawMixPick(){
     <div class="mxchips">${mixLessons().map(l => { const on = MXP.sel.has(l.n); return `<button class="mxchip${on?' on':''}${MXP.anchor===l.n?' anchor':''}" data-act="mxchip" data-l="${l.n}" aria-pressed="${on}" title="${esc(l.t)}"><b>${l.n ? l.n : '入門'}</b><small>${l.n ? '課・' : ''}${mixCount(l.n)}句</small></button>`; }).join('')}</div>
     <div class="row mxfromto small"><span>一次選一段：從</span><select id="mxFrom" aria-label="從哪一課">${opts}</select><span>到</span><select id="mxTo" aria-label="到哪一課">${opts}</select><button class="btn sm ghost" data-act="mxft">加入這一段</button></div>
   </div>
-  <div class="card mxpick"><div class="mxbar"><b>② 題數</b></div>
+  <div class="card mxpick"><div class="mxbar"><b>② 難度</b><span class="small mute">${MIX_LV_DESC[MXP.lv]}</span></div>
+    <div class="seg mxlv" role="group" aria-label="難度">${['e','m','h'].map(k => `<button data-act="mxlv" data-lv="${k}" class="${MXP.lv===k?'on':''}" aria-pressed="${MXP.lv===k}">${MIX_LV[k]}</button>`).join('')}</div></div>
+  <div class="card mxpick"><div class="mxbar"><b>③ 題數</b></div>
     <div class="seg" role="group" aria-label="題數">${[10,20,0].map(n => `<button data-act="mxn" data-n="${n}" class="${MXP.n===n?'on':''}">${n ? n+' 句' : '全部'}</button>`).join('')}</div></div>
-  <div class="mxgo"><div class="small"><b>已選：</b>${esc(selLabel(sel))}<span class="mute">（可出題 ${pool} 句）</span></div>
+  <div class="mxgo"><div class="small"><b>已選：</b>${esc(selLabel(sel))}・<b>${MIX_LV[MXP.lv]}</b><span class="mute">（可出題 ${pool} 句）</span></div>
     <button class="btn mxstart" data-act="mxstart"${pool ? '' : ' disabled'}>▶ 開始測驗${pool ? `（${take} 句）` : ''}</button></div>`;
   const f = $('#mxFrom'), t = $('#mxTo'); if(f && t){ f.value = String(sel.length ? sel[0] : 1); t.value = String(sel.length ? sel[sel.length-1] : 3); }
 }
-function mixStart(sel, n, push){
-  MX = {key:selEncode(sel), sel, order:mixBuildOrder(sel, n), pos:0, idk:new Set(), done:false};
+function mixStart(sel, n, push, lv){
+  lv = lv || mixLv();
+  MX = {key:mixKey(sel, lv), sel, lv, order:mixBuildOrder(sel, n, lv), pos:0, idk:new Set(), done:false};
   const h = '#/mix/' + MX.key; if(push && location.hash !== h) history.pushState(null, '', h);
   reveal = {}; drawMixRun(); window.scrollTo(0, 0);
   playLine(DLG.mx, MX.order[0]);
 }
 function viewMixRun(key){
-  const sel = selDecode(key);
-  if(!sel.length || !mixPool(sel).length) return viewMixPick();
-  if(!MX || MX.key !== selEncode(sel)) MX = {key:selEncode(sel), sel, order:mixBuildOrder(sel, mixPref().n), pos:0, idk:new Set(), done:false};
+  const [sk, lk] = String(key).split('@'), lv = MIX_LV[lk] ? lk : 'm';
+  const sel = selDecode(sk);
+  if(!sel.length || !mixPool(sel, lv).length) return viewMixPick();
+  if(!MX || MX.key !== mixKey(sel, lv)) MX = {key:mixKey(sel, lv), sel, lv, order:mixBuildOrder(sel, mixPref().n, lv), pos:0, idk:new Set(), done:false};
   if(!keepReveal) reveal = {};
   drawMixRun();
 }
 function drawMixRun(){
   renderSide('mix');
-  const d = DLG.mx, n = MX.order.length, lab = esc(selLabel(MX.sel));
+  const d = DLG.mx, n = MX.order.length, lab = esc(selLabel(MX.sel)), lvb = `<span class="mxlvtag lv-${MX.lv||'m'}">${MIX_LV[MX.lv||'m']}</span>`;
   const crumb = `<div class="crumb"><a href="#/">首頁</a> › <a href="#/mix">綜合聽力測驗</a> › ${lab}</div>`;
   if(MX.done){ current = null; const k = MX.idk.size;
     $('#view').innerHTML = `${crumb}<h1>🎉 這一輪完成了！</h1>
-    <div class="card mxsum"><div>範圍：<b>${lab}</b></div><div style="margin-top:4px">共聽了 <b>${n}</b> 句${k ? `・按了「🙋 我不會」<b>${k}</b> 句（已加入複習清單）` : '・沒有按「我不會」，很棒！'}</div></div>
+    <div class="card mxsum"><div>範圍：<b>${lab}</b>　難度：${lvb}</div><div style="margin-top:4px">共聽了 <b>${n}</b> 句${k ? `・按了「🙋 我不會」<b>${k}</b> 句（已加入複習清單）` : '・沒有按「我不會」，很棒！'}</div></div>
     <div class="row" style="margin-top:12px"><button class="btn" data-act="mxagain">🔁 同範圍再來一輪</button><a class="btn alt" href="#/mix" style="text-decoration:none">🎯 換課</a>${k ? `<a class="btn ghost" href="#/review" style="text-decoration:none">📝 複習清單</a>` : ''}</div>`;
     return; }
   const i = MX.order[MX.pos];
   current = {type:'mix', d, idxs:[i]};
   $('#view').innerHTML = `${crumb}
   <div class="mxhead"><h1>🎧 綜合聽力測驗</h1><a class="btn sm ghost" href="#/mix" style="text-decoration:none">🎯 換課</a></div>
-  <div class="mxprog"><div class="small"><b>第 ${MX.pos+1} / ${n} 句</b><span class="mute">　範圍：${lab}</span></div><div class="bar"><i style="width:${Math.round((MX.pos+1)/n*100)}%"></i></div></div>
+  <div class="mxprog"><div class="small"><b>第 ${MX.pos+1} / ${n} 句</b>　${lvb}<span class="mute">　範圍：${lab}</span></div><div class="bar"><i style="width:${Math.round((MX.pos+1)/n*100)}%"></i></div></div>
   <div class="row mxplay"><button class="btn" data-act="play" data-d="mx" data-i="${i}">🔊 播放</button><button class="btn sm ghost" data-act="rep" data-d="mx" data-i="${i}">🔁 聽 3 次</button>${speedSegHTML()}</div>
   <div class="lines mxline">${lineHTML(d, i, {})}</div>
   <details class="mxdet"><summary>📋 這句用到的單語・文型・變化（含中文）</summary><div class="mxdetbody">${mixInfoHTML(i)}</div></details>
@@ -1290,6 +1298,8 @@ function mixInfoHTML(i){
   const m = MIX[i]; if(!m) return '';
   const rd = (w, r) => r && r!==w ? `（${esc(r)}）` : '';
   let h = `<div class="mxinfo"><div class="mxzh"><b>中文</b>　${esc(m.zh)}</div>`;
+  const sents = (m.furi.match(/[^。？！]+[。？！]?/g) || []).map(t => t.replace(/^[　\s]+/, '').replace(/[【】]/g, '')).filter(t => t.trim());
+  if(sents.length > 1) h += `<div class="mxsec"><b>🧩 分句</b>（這一題有 ${sents.length} 句，下面的單語・文型・變化包含全部句子）<ol class="mxsents">${sents.map(t => `<li>${furiHTML(t)}</li>`).join('')}</ol></div>`;
   if(m.v && m.v.length) h += `<div class="mxsec"><b>📗 單語</b><ul>${m.v.map(([w, r, zh, l]) => `<li><span class="mxw">${esc(w)}</span>${rd(w, r)}＝${esc(zh)}${l!=null ? ` <em>${l==='補' ? '補充單字' : lsName(+l)}</em>` : ''}</li>`).join('')}</ul></div>`;
   if(m.g && m.g.length) h += `<div class="mxsec"><b>📐 文型</b><ul>${m.g.map(k => { const g = B.grammar[k]; if(!g) return '';
       return `<li><a href="${DRILL[k] ? '#/g/'+k : '#/l/'+g.l}">${gPatHTML(k, gLabel(k))}</a><div class="small mute">${esc(g.zh)}</div></li>`; }).join('')}</ul></div>`;
@@ -1298,7 +1308,7 @@ function mixInfoHTML(i){
   if(m.a && m.a.length) h += `<div class="mxsec"><b>🎨 形容詞變化</b><ul>${m.a.map(([base, r, used, form, t]) => { const ur = mixReading(base, r, used);
       return `<li><span class="mxw">${esc(base)}</span>${rd(base, r)} → <b class="mxused">${esc(used)}</b>${ur ? `（${esc(ur)}）` : ''}<span class="mxform">${esc(form)}</span><em>${t==='な' ? 'な形容詞' : 'い形容詞'}</em></li>`; }).join('')}</ul></div>`;
   if(m.n) h += `<div class="mxsec"><b>💡 補充</b><div class="small">${esc(m.n)}</div></div>`;
-  h += `<div class="small mute mxls">用到：${(m.ls||[]).map(lsName).join('・')}（本句屬於${lsName(m.l)}，選到${lsName(m.l)}才會出現）</div>`;
+  h += `<div class="small mute mxls">難度：${MIX_LV[m.lv||'m']}・用到：${(m.ls||[]).map(lsName).join('・')}（本句屬於${lsName(m.l)}，選到${lsName(m.l)}才會出現）</div>`;
   return h + `</div>`;
 }
 function mixSrcHTML(d, i){
@@ -1317,10 +1327,11 @@ function mixAct(act, b, e){
   else if(act==='mxrange'){ MXP.rangeMode = !MXP.rangeMode; MXP.anchor = null; }
   else if(act==='mxft'){ const a = +$('#mxFrom').value, z = +$('#mxTo').value; for(let n = Math.min(a,z); n <= Math.max(a,z); n++) if(mixCount(n)) MXP.sel.add(n); toast(`已加入 ${lsName(Math.min(a,z))}～${lsName(Math.max(a,z))}`); }
   else if(act==='mxn') MXP.n = +b.dataset.n;
+  else if(act==='mxlv') MXP.lv = MIX_LV[b.dataset.lv] ? b.dataset.lv : 'm';
   else if(act==='mxstart'){ const sel = [...MXP.sel].sort((a,b)=>a-b); if(!mixPool(sel).length){ toast('請先選課'); return; } saveMixPref(); mixStart(sel, MXP.n, true); return; }
   else if(act==='mxnext'){ stopAll(); if(MX.pos < MX.order.length-1){ MX.pos++; reveal = {}; drawMixRun(); window.scrollTo(0, 0); playLine(DLG.mx, MX.order[MX.pos]); } else { MX.done = true; drawMixRun(); window.scrollTo(0, 0); } return; }
   else if(act==='mxprev'){ stopAll(); if(MX.pos > 0){ MX.pos--; reveal = {}; drawMixRun(); window.scrollTo(0, 0); playLine(DLG.mx, MX.order[MX.pos]); } return; }
-  else if(act==='mxagain'){ mixStart(MX.sel, mixPref().n, false); return; }
+  else if(act==='mxagain'){ mixStart(MX.sel, mixPref().n, false, MX.lv); return; }
   saveMixPref(); drawMixPick();
 }
 
@@ -1697,7 +1708,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.26（新增首頁「🎧 綜合聽力測驗」：自選課（單選・複選・連選），用所選課的單語・本文・文型組成 289 句新句子，先聽再看，下拉可看單語・文型・動詞與形容詞變化；音檔已加入離線下載）</div>
+  <div class="foot">版本 3.27（綜合聽力測驗新增「簡單／中等／難」三種難度（預設中等），難度「難」包含兩句連在一起的題目；句庫增加到 470 句，每課每種難度至少 8 句）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

@@ -755,7 +755,7 @@ a.card.mxhome>div:nth-child(2){flex:1;min-width:0}
 .mxchip.anchor{box-shadow:0 0 0 3px var(--gold)}
 .mxfromto{margin-top:10px}
 .mxfromto select{min-height:36px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff;font-size:14px}
-.mxgo{position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:12px 0;padding:10px 12px calc(10px + var(--safe-b,0px));background:#fffffff2;border:1px solid var(--line);border-radius:14px;box-shadow:0 -2px 8px #0000000f}
+.mxgo{position:static;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:12px 0;padding:10px 12px calc(10px + var(--safe-b,0px));background:#fffffff2;border:1px solid var(--line);border-radius:14px;box-shadow:0 -2px 8px #0000000f}
 .mxstart[disabled]{opacity:.45}
 .mxhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .mxhead h1{margin:6px 0}
@@ -780,3 +780,11 @@ a.card.mxhome>div:nth-child(2){flex:1;min-width:0}
 .mxnav{justify-content:space-between;margin:12px 0}
 .mxnav .mxnext{margin-left:auto;min-width:140px}
 .src .mxinfo{margin-top:6px}
+/* v3.27 難度 */
+.mxlvtag{display:inline-block;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.7;vertical-align:1px}
+.mxlvtag.lv-e{background:#e2f4d6;color:#1d6434}
+.mxlvtag.lv-m{background:#fbf5e8;color:#8a5a00;border:1px solid #ecd9ae}
+.mxlvtag.lv-h{background:#fde8e7;color:#b3261e}
+.seg.mxlv button{min-width:72px}
+.mxsents{margin:4px 0 0;padding-left:20px}
+.mxsents li{margin:2px 0;line-height:1.9}
