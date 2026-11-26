@@ -441,7 +441,6 @@
     lines: packLines(T11_WORDS, 'word').concat(packLines(T11_EXPR, 'expr'))
   };
   root.BOOK.tango[13] = {
-    noImg: true,  // 單語插圖製作中；做好後拿掉這行
     pages: [60, 61],
     source: '官方單語表',
     title: 'インタビュー調査',
@@ -450,7 +449,6 @@
     lines: packLines(T13_WORDS, 'word').concat(packLines(T13_EXPR, 'expr'))
   };
   root.BOOK.tango[14] = {
-    noImg: true,  // 單語插圖製作中；做好後拿掉這行
     pages: [76, 77],
     source: '官方單語表',
     title: 'サラさんの日記',
@@ -459,7 +457,6 @@
     lines: packLines(T14_WORDS, 'word').concat(packLines(T14_EXPR, 'expr'))
   };
   root.BOOK.tango[15] = {
-    noImg: true,  // 單語插圖製作中；做好後拿掉這行
     pages: [90, 91, 92, 93],
     source: '官方單語表',
     title: 'どちらのほうが近いですか。',
