@@ -631,6 +631,13 @@ function syncTexAllBtn(){
   const allOpen = dts.length && dts.every(d => d.open);
   b.textContent = allOpen ? '收合全部例句' : '展開全部例句';
 }
+function tangoImgSrc(d, i){
+  const ln = d && d.lines && d.lines[i];
+  if(!ln || ln.kind==='expr') return '';
+  const m = String(d.id||'').match(/^t(\d+)$/);
+  if(!m) return '';
+  return `pages/tango/img/${m[1]}-${i}.webp`;
+}
 function tangoRowHTML(d, i){
   const ln = d.lines[i], key = d.id+':'+i;
   const lv = (reveal[key]||0);
@@ -641,11 +648,15 @@ function tangoRowHTML(d, i){
   const hasEx = tangoHasEx(d, ln);
   const open = hasEx && texCardOpen(key);
   const chev = hasEx ? `<button type="button" class="texchev" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"></button>` : '';
+  const src = tangoImgSrc(d, i);
+  const imgOpen = !!tangoImgOpen[key];
+  const imgBtn = src ? `<button type="button" class="timg${imgOpen?' on':''}" data-act="tangoimg" data-k="${key}" aria-expanded="${imgOpen?'true':'false'}" aria-label="放大插圖" title="點一下放大"><img src="${src}" alt="" decoding="async" width="56" height="56" onerror="const b=this.closest('.timg'); if(b) b.hidden=true; const x=document.getElementById('timg-${key.replace(':','_')}'); if(x) x.remove();"></button>` : '';
+  const imgBox = src ? `<div class="timgbox${imgOpen?' open':''}" id="timg-${key.replace(':','_')}" data-for="${key}"><img src="${src}" alt="" decoding="async" data-act="tangoimg" data-k="${key}"></div>` : '';
   return `<div class="line srow trow twd${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
-    <div class="tnum">${esc(ln.lab||String(i+1))}</div>
+    <div class="tleft"><div class="tnum">${esc(ln.lab||String(i+1))}</div>${imgBtn}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
     <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${chev}</div>
-  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
+  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>${imgBox}`;
 }
 function toggleTangoPage(n, pg){
   const key = 'tp-'+n+'-'+pg;
@@ -983,6 +994,7 @@ document.addEventListener('keydown', e => { if(!PM || /INPUT|SELECT|TEXTAREA/.te
   if(e.key==='Escape'){ e.preventDefault(); closePageModal(); } else if(e.key==='ArrowRight') PM.go(1); else if(e.key==='ArrowLeft') PM.go(-1); }, true);
 
 let reveal = {}; // key -> level 0..2
+let tangoImgOpen = {}; // 單語插圖是否放大
 function lineHTML(d, i, opts={}){
   const ln = d.lines[i]; const key = d.id+':'+i; const sp = d.sp[ln.s];
   const lv = (reveal[key]||0);
@@ -1432,6 +1444,7 @@ document.addEventListener('click', e => {
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='tangopg'){ toggleTangoPage(+b.dataset.n, +b.dataset.pg); }
   else if(act==='texall'){ const box = b.closest('.tlist') || document; const dts = [...box.querySelectorAll('details.tex')]; const open = dts.some(d => !d.open); dts.forEach(d => { d.open = open; const c = d.closest('.tcard'); if(c) syncTexChev(c); }); syncTexAllBtn(); }
+  else if(act==='tangoimg'){ e.preventDefault(); const k = b.dataset.k; if(!k) return; tangoImgOpen[k] = !tangoImgOpen[k]; const on = !!tangoImgOpen[k]; const box = document.getElementById('timg-'+k.replace(':','_')); if(box) box.classList.toggle('open', on); document.querySelectorAll(`.timg[data-k="${k}"]`).forEach(x => { x.classList.toggle('on', on); x.setAttribute('aria-expanded', on?'true':'false'); }); if(on && box){ const r = box.getBoundingClientRect(); if(r.bottom > innerHeight) box.scrollIntoView({block:'nearest', behavior:'smooth'}); } }
   else if(act==='texone'){ e.preventDefault(); const card = b.closest('.tcard'); const dt = card && card.querySelector('details.tex'); if(dt){ dt.open = !dt.open; syncTexChev(card); syncTexAllBtn(); } }
   else if(act==='playhelp'){ e.preventDefault(); toast(b.dataset.tip || b.title || '說明'); }
   else if(act==='got'){ if(window.SyncMerge) SyncMerge.tomb(S,'review',b.dataset.k); delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
@@ -1468,11 +1481,11 @@ const PAGES_CACHE = 'nh-pages-v1';   // 與 sw.js 的 PAGES 相同
 function imageList(){ const L = []; for(let p = BOOKL.pages[0]; p <= BOOKL.pages[1]; p++) L.push(pageSrc(p));
   Object.values(window.SEC || {}).forEach(es => es.forEach(e => L.push('pages/sec/' + e[0])));
   Object.values(window.BLK || {}).forEach(bs => bs.forEach(b => b[1].forEach(e => L.push('pages/' + e[0]))));
-  Object.entries(B.tango || {}).forEach(([n, T]) => (T.pages||[]).forEach(pg => L.push(`pages/tango/${n}-p${pg}.webp`))); return [...new Set(L)]; }
+  Object.entries(B.tango || {}).forEach(([n, T]) => { (T.pages||[]).forEach(pg => L.push(`pages/tango/${n}-p${pg}.webp`)); (T.lines||[]).forEach((ln,i) => { if(ln.kind!=='expr') L.push(`pages/tango/img/${n}-${i}.webp`); }); }); return [...new Set(L)]; }
 const relKey = (u, re) => { try{ const m = new URL(u, location.href).pathname.match(re); return m ? m[1] : null; }catch(e){ return null; } };
 const OFF = {
   audio: {name: AUDIO_CACHE, list: audioList, re: /\/(audio\/[^/]+\.mp3)$/, old: /^nh-audio-/},
-  img:   {name: PAGES_CACHE, list: async () => imageList(), re: /\/(pages\/(?:p\d+|(?:sec|blk|tango)\/[^/]+)\.webp)$/, old: /^nh-pages-/},
+  img:   {name: PAGES_CACHE, list: async () => imageList(), re: /\/(pages\/(?:p\d+|(?:sec|blk)\/[^/]+|tango\/(?:img\/)?[^/]+)\.webp)$/, old: /^nh-pages-/},
 };
 // 只算清單內的；prune 時順便清掉舊版快取、清單外的舊檔、重複的（不同網址寫法）
 async function offScan(kind, prune){
@@ -1529,7 +1542,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.20（小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.21（第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
