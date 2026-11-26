@@ -657,6 +657,7 @@ function tangoImgSrc(d, i){
   if(!ln || ln.kind==='expr') return '';
   const m = String(d.id||'').match(/^t(\d+)$/);
   if(!m) return '';
+  if(((B.tango||{})[m[1]]||{}).noImg) return '';   // 插圖還沒做好的課：不顯示、不列入離線清單
   return `pages/tango/img/${m[1]}-${i}.webp`;
 }
 function tangoRowHTML(d, i){
@@ -1714,7 +1715,7 @@ const PAGES_CACHE = 'nh-pages-v1';   // 與 sw.js 的 PAGES 相同
 function imageList(){ const L = []; for(let p = BOOKL.pages[0]; p <= BOOKL.pages[1]; p++) L.push(pageSrc(p));
   Object.values(window.SEC || {}).forEach(es => es.forEach(e => L.push('pages/sec/' + e[0])));
   Object.values(window.BLK || {}).forEach(bs => bs.forEach(b => b[1].forEach(e => L.push('pages/' + e[0]))));
-  Object.entries(B.tango || {}).forEach(([n, T]) => { (T.pages||[]).forEach(pg => L.push(`pages/tango/${n}-p${pg}.webp`)); (T.lines||[]).forEach((ln,i) => { if(ln.kind!=='expr') L.push(`pages/tango/img/${n}-${i}.webp`); }); }); return [...new Set(L)]; }
+  Object.entries(B.tango || {}).forEach(([n, T]) => { (T.pages||[]).forEach(pg => L.push(`pages/tango/${n}-p${pg}.webp`)); if(!T.noImg) (T.lines||[]).forEach((ln,i) => { if(ln.kind!=='expr') L.push(`pages/tango/img/${n}-${i}.webp`); }); }); return [...new Set(L)]; }
 const relKey = (u, re) => { try{ const m = new URL(u, location.href).pathname.match(re); return m ? m[1] : null; }catch(e){ return null; } };
 const OFF = {
   audio: {name: AUDIO_CACHE, list: audioList, re: /\/(audio\/[^/]+\.mp3)$/, old: /^nh-audio-/},
@@ -1775,7 +1776,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.33（綜合聽力測驗句庫擴充：每課每級至少 20 句，共 1157 句，含離線音檔）</div>
+  <div class="foot">版本 3.34（新增第13～15課單語：160 詞＋3 句表現、例句 480 句、音檔）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
