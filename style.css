@@ -625,3 +625,30 @@ details.tex > summary.texsr{position:absolute;width:1px;height:1px;padding:0;mar
   .tcard .exrow{margin-left:6px}
   .texchev{width:32px;height:32px}
 }
+
+/* 課程頁：小測驗狀態（一眼看出已測／未測） */
+.qsum{display:inline-flex;align-items:baseline;gap:6px;margin:0 0 10px;padding:8px 12px;border-radius:10px;background:var(--pale);border:1px solid var(--pale2);color:var(--teal);font-size:14px;font-weight:700}
+.qsum-num{font-size:20px;font-weight:800;color:var(--pri);letter-spacing:.02em}
+.qsum-lab{font-size:13px;font-weight:700}
+.qsum.all{background:#eaf7ef;border-color:#b4e2a0}
+a.card.qcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 12px;align-items:center;text-decoration:none}
+.qcard-main{min-width:0}
+.qcard-side{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:4px;min-width:86px;text-align:center;flex:none}
+.qst{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;padding:6px 8px;line-height:1.2;min-height:44px;box-sizing:border-box}
+.qst-mark{font-size:14px;line-height:1}
+.qst-lab{font-size:11px;font-weight:700;letter-spacing:.04em}
+.qst-score{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.qst-ok{background:var(--pri);color:#fff;box-shadow:0 1px 2px #1d643433}
+.qst-mid{background:#fbf5e8;color:var(--warn);border:1.5px solid #d4a04a}
+.qst-todo{background:transparent;color:var(--mute);border:1.5px dashed #c5cdc0;font-size:13px;font-weight:700;min-height:40px}
+.qcard-ok{border-color:#b4e2a0;box-shadow:inset 4px 0 0 var(--pri),0 1px 2px #0000000d}
+.qcard-mid{border-color:#e2cc94;box-shadow:inset 4px 0 0 var(--gold),0 1px 2px #0000000d}
+.qcard-todo{box-shadow:0 1px 2px #0000000d}
+.hst{font-size:11px;font-weight:700;color:var(--teal);background:#fff;border:1px solid var(--pale2);border-radius:999px;padding:2px 8px;text-align:center}
+@media (max-width:560px){
+  .qcard-side{min-width:76px}
+  .qst{padding:5px 6px;min-height:42px}
+  .qst-score{font-size:15px}
+  .qst-todo{font-size:12px}
+  .qsum-num{font-size:18px}
+}

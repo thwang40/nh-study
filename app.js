@@ -370,13 +370,15 @@ function viewHome(){
 
 function tangoLessonCard(n){
   const T = B.tango[n], nw = (T.words||[]).length, ne = (T.expr||[]).length;
-  const q = DLG['t'+n] && S.quiz['t'+n] != null ? `・測驗最佳 ${S.quiz['t'+n]}%` : '';
+  const q = qStatusOf('t'+n);
   return `<h2>📝 本課單語</h2>
-  <a class="card tango-card" href="#/t/${n}" style="text-decoration:none;display:block">
+  <a class="card tango-card qcard ${q.cls}" href="#/t/${n}" style="text-decoration:none">
+    <div class="qcard-main">
     <div class="lnum"><span class="badge txt">單語</span> ${T.source||'官方單語表'} p.${(T.pages&&T.pages.length)?(T.pages[0]+'–'+T.pages[T.pages.length-1]):''}</div>
     <div class="ltitle">先聽再看・第${n}課單語</div>
-    <div class="small mute">${nw} 個單語（各 3 句例句）${ne?`＋${ne} 句「いろいろな表現」`:''}${q}</div>
+    <div class="small mute">${nw} 個單語（各 3 句例句）${ne?`＋${ne} 句「いろいろな表現」`:''}</div>
     <div class="small mute" style="margin-top:2px">點進去先聽語音，再點文字看日文、假名與中文。每個單語附 3 句聽力例句。</div>
+    </div>${q.side}
   </a>`;
 }
 function tangoPages(n){ const T = (B.tango||{})[n]; return (T && T.pages) || []; }
@@ -595,6 +597,7 @@ function viewLesson(n){
   ${playerHTML(true)}
   <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
   <div class="small mute" style="margin:0 0 8px">「全部播放」會依下面的順序（課本頁序 → 實用會話）一句一句播完整課。</div>
+  ${lessonQuizSummaryHTML(n)}
   <h2>📖 課本內容（依課本頁序${n?'：本文＋文型':''}）</h2>
   <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
   ${n?`<h2>🎧 實用會話（依本課文型自編）</h2>
@@ -683,9 +686,33 @@ function viewDrill(k){
   ${flowNavHTML(d)}`;
   bindPlayer();
 }
+function quizScore(id){ const v = S.quiz[id]; return v==null ? null : +v; }
+function qStatusOf(id){
+  const sc = quizScore(id), heard = !!S.done[id];
+  let side, cls;
+  if(sc==null){ side = `<div class="qst qst-todo">未測驗</div>`; cls = 'qcard-todo'; }
+  else if(sc>=100){ side = `<div class="qst qst-ok"><span class="qst-mark">✔</span><span class="qst-lab">測驗</span><span class="qst-score">100%</span></div>`; cls = 'qcard-ok'; }
+  else { side = `<div class="qst qst-mid"><span class="qst-mark">✔</span><span class="qst-lab">測驗</span><span class="qst-score">${sc}%</span></div>`; cls = 'qcard-mid'; }
+  if(heard) side += `<div class="hst">已聽完</div>`;
+  return {cls, side: `<div class="qcard-side">${side}</div>`};
+}
+function lessonQuizItems(n){
+  const ids = (FLOW[n]||[]).map(d => d.id);
+  if(B.tango && B.tango[n] && DLG['t'+n]) ids.push('t'+n);
+  return ids;
+}
+function lessonQuizSummaryHTML(n){
+  const ids = lessonQuizItems(n);
+  if(!ids.length) return '';
+  const done = ids.filter(id => quizScore(id)!=null).length;
+  return `<div class="qsum${done===ids.length?' all':''}"><span class="qsum-lab">小測驗</span><span class="qsum-num">${done}/${ids.length}</span><span class="qsum-lab">已完成</span></div>`;
+}
 function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
-  return `<a class="card gcard" href="#/g/${k}"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span> ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${gPatHTML(k, g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></a>`; }
-function dCard(d){ return `<a class="card" href="#/d/${d.id}"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`} ${S.done[d.id]?'<span class="badge">已聽完</span>':''} ${S.quiz[d.id]!=null?`<span class="badge">測驗 ${S.quiz[d.id]}%</span>`:''}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></a>`; }
+  const q = qStatusOf(d.id);
+  return `<a class="card gcard qcard ${q.cls}" href="#/g/${k}"><div class="qcard-main"><div class="lnum"><span class="badge">${k[0]==='0'?'入門':'文型'+esc(k.split('-')[1])}・p.${g.pg}</span></div><div class="ltitle">${gPatHTML(k, g.t||g.p)}</div><div class="small mute">${k[0]==='0'?'課本內容':'課本例句'} ${d.lines.length} 句</div></div>${q.side}</a>`; }
+function dCard(d){
+  const q = qStatusOf(d.id);
+  return `<a class="card qcard ${q.cls}" href="#/d/${d.id}"><div class="qcard-main"><div class="lnum">${d.src?`<span class="badge txt">${esc(d.src.label)}・p.${d.src.page}</span>`:`<span class="badge">實用會話 ${esc(d.id)}</span>`}</div><div class="ltitle">${esc(d.title)}</div><div class="small mute">${esc(d.scene)}（${d.lines.length} 句）</div></div>${q.side}</a>`; }
 /* ---------------- textbook pages ---------------- */
 const pageList = L => { const a=[]; for(let p=L.pages[0]; p<=L.pages[1]; p++) a.push(p); return a; };
 // 整本課本（使用者提供的 PDF 全部 272 頁，0 = 封面前空白頁；253 起為別冊，頁碼另計）
@@ -1411,7 +1438,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.16（第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.17（課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
