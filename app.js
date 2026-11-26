@@ -1329,7 +1329,7 @@ function mixInfoHTML(i){
   if(m.g && m.g.length){
     // v3.31：文型小卡（同單語卡）：標題＋課次 → 意思 → 本句（用到文型的部分紅字、漢字上方假名）→ 課本例句（可播）
     const GM = (B.mixGM || [])[i] || {}, GX = B.mixG || {};
-    const mk = f => furiHTML(f).replace(/〔/g, '<b class="mxgm">').replace(/〕/g, '</b>');
+    const mk = f => furiHTML(f).replace(/〔/g, '<span class="mxgm">').replace(/〕/g, '</span>');
     h += `<div class="mxblk"><div class="mxlab">文型</div><div class="mxgl">${m.g.map(k => { const g = B.grammar[k]; if(!g) return '';
       const no = k.split('-')[1], gx = GX[k] || {}, href = DRILL[k] ? '#/g/'+k : '#/l/'+g.l;
       const sen = GM[k] || (m.furi || '').replace(/[【】]/g, '');
@@ -1337,10 +1337,11 @@ function mixInfoHTML(i){
       const same = gx.ex2 && plain(gx.ex) === plain(sen);   // 本句剛好就是課本例句 → 改用另一句課本例句
       const ex = (same ? gx.ex2 : gx.ex) || (g.main || g.ex || '').replace(/[【】]/g, ''), xi = same ? gx.i2 : gx.i;
       const play = DRILL[k] && xi != null && DRILL[k].lines[xi] ? `<button class="mxgplay" data-act="play" data-d="g${esc(k)}" data-i="${xi}" aria-label="播放課本例句">▶</button>` : '';
-      return `<div class="mxg card2"><a class="mxg-h" href="${href}"><span class="gpat">【${esc(g.p)}】</span><span class="mxpill">${esc(lsName(g.l))}・文型${esc(no)}${g.pg ? `・p.${g.pg}` : ''}</span><span class="mxg-go">›</span></a>`
+      return `<div class="mxg card2"><a class="mxg-src" href="${href}"><span>出處：${esc(lsName(g.l))}・文型${esc(no)}${g.pg ? `・p.${g.pg}` : ''}</span><span class="mxg-go">›</span></a>`
+        + `<a class="mxg-h" href="${href}"><span class="mxg-p">【${esc(g.p)}】</span></a>`
         + (g.zh ? `<div class="mxg-row"><span class="mxusel">意思</span><span class="mxg-zh">${esc(g.zh)}</span></div>` : '')
-        + `<div class="mxg-row"><span class="mxusel">本句</span><span class="mxg-s">${mk(sen)}</span></div>`
         + (ex ? `<div class="mxg-row mxg-exr"><span class="mxusel">課本例句</span><span class="mxg-ex">${mk(ex)}</span>${play}</div>` : '')
+        + `<div class="mxg-row"><span class="mxusel">本句</span><span class="mxg-s">${mk(sen)}</span></div>`
         + `</div>`; }).join('')}</div></div>`;
   }
   if(m.n) h += `<div class="mxblk"><div class="mxlab">補充</div><div class="mxnote">${esc(m.n)}</div></div>`;
@@ -1774,7 +1775,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.31（綜合聽力測驗解說：文型改成小卡——意思、本句用到的部分標紅並加假名、課本例句可播放）</div>
+  <div class="foot">版本 3.32（綜合聽力測驗文型小卡：出處（第幾課・文型・頁）放最上面、課本例句移到本句上方、不再用紅色粗體）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

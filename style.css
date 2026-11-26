@@ -891,3 +891,10 @@ a.card.mxhome>div:nth-child(2){flex:1;min-width:0}
 .mxgm rt{color:var(--alert);font-weight:400}
 .mxgplay{flex:0 0 auto;margin-left:auto;border:1px solid var(--line);background:#fff;color:var(--pri);border-radius:999px;width:26px;height:26px;font-size:11px;line-height:1;cursor:pointer;padding:0}
 @media (max-width:480px){.mxg-row .mxusel{min-width:4.2em}.mxg-s{font-size:14px}}
+
+/* v3.32 文型小卡：出處醒目、不用紅色粗體 */
+.mxg-src{display:flex;align-items:center;gap:6px;text-decoration:none;color:var(--pri);font-weight:700;font-size:14px;padding-bottom:4px;border-bottom:1px solid #e3eadf;margin-bottom:4px}
+.mxg-src .mxg-go{margin-left:auto}
+.mxg-p{font-size:15px;font-weight:500;color:var(--ink);overflow-wrap:anywhere}
+.mxgm{color:var(--pri);font-weight:inherit;text-decoration:underline;text-decoration-color:#9cc79a;text-decoration-thickness:2px;text-underline-offset:3px}
+.mxgm rt{color:var(--mute);font-weight:400}
