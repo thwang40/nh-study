@@ -90,7 +90,7 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
   .side a{display:block;padding:8px 10px;border-radius:10px;text-decoration:none;font-size:14px}
   .side a.cur{background:var(--pale);color:var(--pri);font-weight:700}
   .side a small{display:block;color:var(--mute);font-size:12px}
-  .view{padding:16px 24px 80px}
+  .view{padding:10px 20px 80px}
   .ja{font-size:22px}
   .lines.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .sheet{align-items:center}.sheet-body{border-radius:18px}
@@ -651,4 +651,31 @@ a.card.qcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 12px
   .qst-score{font-size:15px}
   .qst-todo{font-size:12px}
   .qsum-num{font-size:18px}
+}
+
+/* 課程／單語頁：緊湊標題列（電腦版把操作收成一列） */
+.lhead-block{margin:0 0 6px}
+.lhead-block .crumb{margin-bottom:0;min-height:0}
+.lhead-block h1{margin:2px 0 0;line-height:1.25;font-size:20px}
+.lhead-sub{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;margin:1px 0 6px;line-height:1.4}
+.lhead-sub .kana{font-size:13px}
+.lhead-zh{font-size:13px;color:var(--mute)}
+.player.lhead-bar{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:0;margin:0;border:0;background:transparent}
+.lhead-bar #playAllBtn{min-height:36px;padding:6px 12px}
+.lhead-pg{white-space:nowrap}
+.info-tip{width:28px;height:28px;border:1px solid var(--line);background:#fff;color:var(--teal);border-radius:999px;font-size:13px;font-weight:700;padding:0;display:inline-grid;place-items:center;flex:none;line-height:1}
+.info-tip:hover,.info-tip:focus-visible{background:var(--pale);border-color:var(--pale2)}
+.nowp:empty{display:none}
+.nowp{min-height:0;margin:4px 0 0;color:var(--mute)}
+.qsum.qsum-pill{margin:0;padding:4px 10px;border-radius:999px;font-size:13px;gap:4px;min-height:32px;align-items:center}
+.qsum.qsum-pill .qsum-num{font-size:15px}
+.lhead-block + h2{margin-top:8px}
+@media (min-width:840px){
+  .lhead-block h1{font-size:22px;margin-top:0}
+  .lhead-sub{margin-bottom:6px}
+  .lhead-block + h2{margin-top:6px;margin-bottom:6px}
+}
+@media (max-width:839px){
+  .lhead-bar #playAllBtn{min-height:40px}
+  .info-tip{width:32px;height:32px}
 }

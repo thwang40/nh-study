@@ -405,15 +405,18 @@ function viewTango(n){
     });
     return html;
   };
+  const playHelp = '先聽，再點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文、第 3 次再隱藏。全部播放預設會先播單語再播它的句子，可取消「含例句」。右邊箭頭可展開底下的聽力句子。';
   $('#view').innerHTML = `
+  <div class="lhead-block">
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">第${n}課 ${esc(L.t)}</a> › 單語</div>
   <h1>第${n}課　單語</h1>
-  <div class="kana">たんご</div>
-  <div class="mute">${esc(L.zh)}・${esc(T.source||'官方單語表')} p.${pgs.length?pgs[0]+'–'+pgs[pgs.length-1]:''}</div>
-  ${playerHTML()}
-  <div class="row" style="margin:-2px 0 8px"><label class="texopt"><input type="checkbox" id="tangoExPlayCb" ${S.tangoExPlay!==false?'checked':''}> 含例句（單語＋3 句）</label></div>
-  <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
-  <div class="small mute" style="margin:0 0 8px">先聽，再點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文、第 3 次再隱藏。每個單語自成一組，右邊箭頭可展開底下的聽力句子（預設收合）。全部播放預設會先播單語再播它的句子，可取消「含例句」。🔊 播放　🔁 重複三次　🙋 加入複習。📖 可看單語表原頁。</div>
+  <div class="lhead-sub"><span class="kana">たんご</span><span class="lhead-zh">${esc(L.zh)}・${esc(T.source||'官方單語表')} p.${pgs.length?pgs[0]+'–'+pgs[pgs.length-1]:''}</span></div>
+  <div class="player lhead-bar">
+    <button class="btn sm" id="playAllBtn">▶ 全部播放</button>${infoTipHTML(playHelp)}${speedSegHTML()}
+    <label class="texopt"><input type="checkbox" id="tangoExPlayCb" ${S.tangoExPlay!==false?'checked':''}> 含例句（單語＋3 句）</label>
+  </div>
+  <div class="small nowp" id="nowPlaying"></div>
+  </div>
   <div class="tlist" data-blk>
     <div class="blkbar">${blkBtn(false)}<button class="btn sm ghost" data-act="texall">展開全部例句</button></div>
     <h2 class="th2">単語　たんご</h2>
@@ -588,16 +591,21 @@ function viewLesson(n){
   renderSide(n); reveal = {};
   current = {type:'review', keys: FLOW[n].flatMap(d => d.lines.map((_,i)=>d.id+':'+i))};
   const gs = Object.entries(B.grammar).filter(([k,g])=>g.l===n);
+  const playHelp = '「全部播放」會依課本頁序再接著實用會話，一句一句播完整課（不含本課單語）。';
   $('#view').innerHTML = `
+  <div class="lhead-block">
   <div class="crumb"><a href="#/">首頁</a> › ${lessonLabel(n)}</div>
   <h1>${n?`第${n}課　`:''}${esc(L.t)}</h1>
-  <div class="kana">${esc(L.r)}</div><div class="mute">${esc(L.zh)}・${esc(L.topic)}</div>
+  <div class="lhead-sub"><span class="kana">${esc(L.r)}</span><span class="lhead-zh">${esc(L.zh)}・${esc(L.topic)}</span></div>
   ${UNCERTAIN[n]?`<div class="scene">⚠️ 注意：${esc(UNCERTAIN[n])}，其他文型已對照官方資料。</div>`:''}
-  <div class="row" style="margin:6px 0"><span class="small mute">課本 p.${L.pages[0]}–${L.pages[1]}</span><a class="btn sm" style="text-decoration:none" href="#/p/${L.n}/0">📄 課本頁面（${L.pages[1]-L.pages[0]+1} 頁）</a></div>
-  ${playerHTML(true)}
-  <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
-  <div class="small mute" style="margin:0 0 8px">「全部播放」會依課本頁序再接著實用會話，一句一句播完整課（不含本課單語）。</div>
-  ${lessonQuizSummaryHTML(n)}
+  <div class="player lhead-bar">
+    <span class="small mute lhead-pg">課本 p.${L.pages[0]}–${L.pages[1]}</span>
+    <a class="btn sm" style="text-decoration:none" href="#/p/${L.n}/0">📄 課本頁面（${L.pages[1]-L.pages[0]+1} 頁）</a>
+    <button class="btn sm" id="playAllBtn">▶ 全部播放</button>${infoTipHTML(playHelp)}${speedSegHTML()}
+    ${lessonQuizSummaryHTML(n)}
+  </div>
+  <div class="small nowp" id="nowPlaying"></div>
+  </div>
   ${B.tango && B.tango[n] ? tangoLessonCard(n) : ''}
   <h2>📖 課本內容（依課本頁序${n?'：本文＋文型':''}）</h2>
   <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
@@ -705,7 +713,7 @@ function lessonQuizSummaryHTML(n){
   const ids = lessonQuizItems(n);
   if(!ids.length) return '';
   const done = ids.filter(id => quizScore(id)!=null).length;
-  return `<div class="qsum${done===ids.length?' all':''}"><span class="qsum-lab">小測驗</span><span class="qsum-num">${done}/${ids.length}</span><span class="qsum-lab">已完成</span></div>`;
+  return `<div class="qsum qsum-pill${done===ids.length?' all':''}"><span class="qsum-lab">小測驗</span><span class="qsum-num">${done}/${ids.length}</span><span class="qsum-lab">已完成</span></div>`;
 }
 function fCard(d){ if(!d.drill) return dCard(d); const k = d.drill, g = B.grammar[k];
   const q = qStatusOf(d.id);
@@ -920,6 +928,9 @@ function playerHTML(noMode){
     <button class="btn" id="playAllBtn">▶ 全部播放</button>
     <div class="seg" role="group" aria-label="速度"><button data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>
   </div></div>`;
+}
+function infoTipHTML(msg){
+  return `<button type="button" class="info-tip" data-act="playhelp" data-tip="${esc(msg)}" title="${esc(msg)}" aria-label="說明">ⓘ</button>`;
 }
 let current = null; // {type, d, idxs}
 // 每個區塊各自的「顯示全文／隱藏」（不儲存；換頁就回到聽力優先）
@@ -1343,6 +1354,7 @@ document.addEventListener('click', e => {
   else if(act==='tangopg'){ toggleTangoPage(+b.dataset.n, +b.dataset.pg); }
   else if(act==='texall'){ const box = b.closest('.tlist') || document; const dts = [...box.querySelectorAll('details.tex')]; const open = dts.some(d => !d.open); dts.forEach(d => { d.open = open; const c = d.closest('.tcard'); if(c) syncTexChev(c); }); syncTexAllBtn(); }
   else if(act==='texone'){ e.preventDefault(); const card = b.closest('.tcard'); const dt = card && card.querySelector('details.tex'); if(dt){ dt.open = !dt.open; syncTexChev(card); syncTexAllBtn(); } }
+  else if(act==='playhelp'){ e.preventDefault(); toast(b.dataset.tip || b.title || '說明'); }
   else if(act==='got'){ if(window.SyncMerge) SyncMerge.tomb(S,'review',b.dataset.k); delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
 $('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
@@ -1438,7 +1450,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.18（本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.19（電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
