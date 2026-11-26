@@ -735,3 +735,48 @@ a.card.qcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 12px
 @media (max-width:839px){
   .flownav .qnext{flex:1 1 12em}
 }
+/* v3.26 綜合聽力測驗 */
+a.card.mxhome{display:flex;align-items:center;gap:12px;margin:10px 0;text-decoration:none;color:inherit;border-left:4px solid var(--gold);background:linear-gradient(90deg,#fbf5e8,#fff 60%)}
+.mxhome-ic{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--teal);font-size:22px}
+a.card.mxhome>div:nth-child(2){flex:1;min-width:0}
+.mxhome-go{flex:none;font-size:26px;color:var(--pri);font-weight:700}
+.mxlead{margin:4px 0 10px}
+.mxpick{margin:10px 0}
+.mxbar{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:8px}
+.mxhint{color:var(--warn)}
+.mxtools{margin-bottom:8px}
+.btn.mxrange.on{background:var(--gold);color:var(--teal)}
+.mxchips{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.mxchip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:52px;padding:4px 2px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mxchip b{font-size:17px;line-height:1.1}
+.mxchip small{font-size:11px;color:var(--mute)}
+.mxchip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.mxchip.on small{color:#e2f4d6}
+.mxchip.anchor{box-shadow:0 0 0 3px var(--gold)}
+.mxfromto{margin-top:10px}
+.mxfromto select{min-height:36px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff;font-size:14px}
+.mxgo{position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:12px 0;padding:10px 12px calc(10px + var(--safe-b,0px));background:#fffffff2;border:1px solid var(--line);border-radius:14px;box-shadow:0 -2px 8px #0000000f}
+.mxstart[disabled]{opacity:.45}
+.mxhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mxhead h1{margin:6px 0}
+.mxprog{margin:6px 0 10px}
+.mxprog .bar{margin-top:4px}
+.mxplay{margin:6px 0}
+.mxline .line{margin:8px 0}
+.mxdet{margin:8px 0;border:1px solid var(--line);border-radius:12px;background:#fff}
+.mxdet>summary{cursor:pointer;padding:10px 12px;font-weight:700;color:var(--pri);list-style-position:inside}
+.mxdet[open]>summary{border-bottom:1px solid var(--line)}
+.mxdetbody{padding:8px 12px 10px}
+.mxinfo .mxzh{background:var(--pale);border-radius:8px;padding:6px 8px;margin-bottom:6px}
+.mxsec{margin:8px 0}
+.mxsec ul{margin:4px 0 0;padding-left:18px}
+.mxsec li{margin:3px 0;line-height:1.55}
+.mxsec li a{color:var(--blue);text-decoration:none}
+.mxw{font-weight:700}
+.mxused{color:var(--alert)}
+.mxform{display:inline-block;margin:0 4px;padding:0 6px;border-radius:6px;background:#fbf5e8;border:1px solid #ecd9ae;font-size:12px}
+.mxsec em{font-style:normal;font-size:12px;color:var(--mute);margin-left:2px}
+.mxls{margin-top:6px}
+.mxnav{justify-content:space-between;margin:12px 0}
+.mxnav .mxnext{margin-left:auto;min-width:140px}
+.src .mxinfo{margin-top:6px}
