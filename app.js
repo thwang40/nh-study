@@ -1300,7 +1300,7 @@ function mixInfoHTML(i){
   let h = `<div class="mxinfo"><div class="mxzh"><b>中文</b>　${esc(m.zh)}</div>`;
   const sents = (m.furi.match(/[^。？！]+[。？！]?/g) || []).map(t => t.replace(/^[　\s]+/, '').replace(/[【】]/g, '')).filter(t => t.trim());
   if(sents.length > 1) h += `<div class="mxsec"><b>🧩 分句</b>（這一題有 ${sents.length} 句，下面的單語・文型・變化包含全部句子）<ol class="mxsents">${sents.map(t => `<li>${furiHTML(t)}</li>`).join('')}</ol></div>`;
-  if(m.v && m.v.length) h += `<div class="mxsec"><b>📗 單語</b><ul>${m.v.map(([w, r, zh, l]) => `<li><span class="mxw">${esc(w)}</span>${rd(w, r)}＝${esc(zh)}${l!=null ? ` <em>${l==='補' ? '補充單字' : lsName(+l)}</em>` : ''}</li>`).join('')}</ul></div>`;
+  if(m.v && m.v.length) h += `<div class="mxsec"><b>📗 單語</b><ul>${m.v.map(([w, r, zh, l]) => `<li><span class="mxw">${esc(w)}</span>${rd(w, r)}＝${esc(zh)}${l!=null ? ` <em>${l==='補' ? '補充單字' : lsName(+l)}</em>` : ''}${mixFormsHTML(w, m)}</li>`).join('')}</ul></div>`;
   if(m.g && m.g.length) h += `<div class="mxsec"><b>📐 文型</b><ul>${m.g.map(k => { const g = B.grammar[k]; if(!g) return '';
       return `<li><a href="${DRILL[k] ? '#/g/'+k : '#/l/'+g.l}">${gPatHTML(k, gLabel(k))}</a><div class="small mute">${esc(g.zh)}</div></li>`; }).join('')}</ul></div>`;
   if(m.c && m.c.length) h += `<div class="mxsec"><b>🔁 動詞變化</b><ul>${m.c.map(([base, r, used, form, grp]) => { const g0 = String(grp).split('（')[0], gx = String(grp).slice(g0.length); const ur = mixReading(base, r, used);
@@ -1310,6 +1310,32 @@ function mixInfoHTML(i){
   if(m.n) h += `<div class="mxsec"><b>💡 補充</b><div class="small">${esc(m.n)}</div></div>`;
   h += `<div class="small mute mxls">難度：${MIX_LV[m.lv||'m']}・用到：${(m.ls||[]).map(lsName).join('・')}（本句屬於${lsName(m.l)}，選到${lsName(m.l)}才會出現）</div>`;
   return h + `</div>`;
+}
+/* 單語裡的動詞／形容詞：列出基本變化（BOOK.mixForms，建置時產生並用詞典驗證），本句用到的那一形標紅 */
+const MXF = B.mixForms || {};
+const MXF_G = {I:'I類（五段）', II:'II類（一段）', III:'III類（不規則）', 'い':'い形容詞', 'な':'な形容詞'};
+function mixFormsHTML(w, m){
+  const F = MXF[w]; if(!F) return '';
+  const used = [...(m.c||[]), ...(m.a||[])].filter(x => x[0]===w).map(x => x[2]);
+  let hit = -1;
+  if(used.length){
+    const cand = [];
+    F.f.forEach(([lab, fu, p], k) => {
+      cand.push([p, k]);
+      if(F.k==='v' && lab==='ます形') cand.push([p.replace(/ます$/, ''), k]);
+      if(F.k==='i'){ const st = p.replace(/(くない|かった|くなかった|くて|く)$/, '');
+        if(lab==='現在否定') cand.push([st + 'くありません', k]);
+        if(lab==='過去否定') cand.push([st + 'くありませんでした', k]); }
+      if(F.k==='na'){ const st = w;
+        if(lab==='現在肯定') cand.push([st + 'です', k]);
+        if(lab==='現在否定') cand.push([st + 'じゃありません', k], [st + 'ではありません', k]);
+        if(lab==='過去肯定') cand.push([st + 'でした', k]);
+        if(lab==='過去否定') cand.push([st + 'じゃありませんでした', k], [st + 'じゃなかったです', k]); }
+    });
+    cand.sort((a, b) => b[0].length - a[0].length);
+    for(const [p, k] of cand){ if(p && used.some(u => u.startsWith(p))){ hit = k; break; } }
+  }
+  return `<div class="mxforms"><span class="mxfg">${esc(MXF_G[F.g] || F.g)}</span>${F.f.map(([lab, fu], k) => `<span class="mxf${k===hit ? ' hit' : ''}"><small>${esc(lab)}</small><span class="mxfv">${furiHTML(fu)}</span></span>`).join('')}</div>`;
 }
 function mixSrcHTML(d, i){
   const m = MIX[i];
@@ -1708,7 +1734,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.27（綜合聽力測驗新增「簡單／中等／難」三種難度（預設中等），難度「難」包含兩句連在一起的題目；句庫增加到 470 句，每課每種難度至少 8 句）</div>
+  <div class="foot">版本 3.28（綜合聽力測驗下拉的單語：動詞列出辭書形・ます形・ません・ました・て形・た形・ない形與動詞分類，形容詞列出現在／過去的肯定・否定與て形，本句用到的那一形標紅）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
