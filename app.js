@@ -1312,18 +1312,19 @@ function mixInfoHTML(i){
     return `<div class="mxv-use">${us.map(({k, x}) => { const [base, r, used, form, grp] = x, ur = mixReading(base, r, used);
       const g0 = String(grp).split('（')[0], gx = String(grp).slice(g0.length);
       const gl = k==='v' ? (VGRP[g0] || g0) + gx : (grp==='な' ? 'な形容詞' : 'い形容詞');
-      return `<div>→ 本句：<b class="mxused">${esc(used)}</b>${ur ? `<span class="mxr">${esc(ur)}</span>` : ''}<span class="mxform">${esc(form)}</span><span class="mxgrp">${esc(gl)}</span></div>`; }).join('')}</div>`; };
+      return `<div><span class="mxusel">本句</span><b class="mxused">${esc(used)}</b>${ur ? `<span class="mxr">${esc(ur)}</span>` : ''}<span class="mxform">${esc(form)}</span>${MXF[w] ? '' : `<span class="mxgrp">${esc(gl)}</span>`}</div>`; }).join('')}</div>`; };
   if(m.v && m.v.length){
-    h += `<div class="mxblk"><div class="mxlab">單語</div><div class="mxvt">${m.v.map(([w, r, zh, l]) => {
-      const extra = useLine(w) + mixFormsHTML(w, m);
-      return `<div class="mxv-w"><b>${esc(w)}</b>${rdS(w, r)}</div><div class="mxv-zh">${esc(zh)}</div><div class="mxv-l">${l!=null ? `<span class="mxpill">${l==='補' ? '補充' : esc(lsName(+l))}</span>` : ''}</div>${extra ? `<div class="mxv-x">${extra}</div>` : ''}`; }).join('')}</div></div>`;
+    h += `<div class="mxblk"><div class="mxlab">單語</div><div class="mxvl">${m.v.map(([w, r, zh, l]) => {
+      const F = MXF[w], extra = useLine(w) + mixFormsHTML(w, m);
+      const head = `<div class="mxv-h"><div class="mxv-w"><b>${esc(w)}</b>${rdS(w, r)}</div><div class="mxv-zh">${esc(zh)}</div><div class="mxv-l">${F ? `<span class="mxgtag">${esc(MXF_G[F.g] || F.g)}</span>` : ''}${l!=null ? `<span class="mxpill">${l==='補' ? '補充' : esc(lsName(+l))}</span>` : ''}</div></div>`;
+      return `<div class="mxv${extra ? ' card2' : ''}">${head}${extra}</div>`; }).join('')}</div></div>`;
   }
   // 單語表沒列到的變化（例如可能形的原形、する動詞）
   const rest = conj.filter(o => !usedSet.has(o));
-  if(rest.length) h += `<div class="mxblk"><div class="mxlab">其他變化</div><div class="mxvt">${rest.map(({k, x}) => { const [base, r, used, form, grp] = x, ur = mixReading(base, r, used);
+  if(rest.length) h += `<div class="mxblk"><div class="mxlab">其他變化</div><div class="mxvl">${rest.map(({k, x}) => { const [base, r, used, form, grp] = x, ur = mixReading(base, r, used);
       const g0 = String(grp).split('（')[0], gx = String(grp).slice(g0.length);
       const gl = k==='v' ? (VGRP[g0] || g0) + gx : (grp==='な' ? 'な形容詞' : 'い形容詞');
-      return `<div class="mxv-w"><b>${esc(base)}</b>${rdS(base, r)}</div><div class="mxv-zh mxv-span2"><b class="mxused">${esc(used)}</b>${ur ? `<span class="mxr">${esc(ur)}</span>` : ''}<span class="mxform">${esc(form)}</span><span class="mxgrp">${esc(gl)}</span></div>`; }).join('')}</div></div>`;
+      return `<div class="mxv card2"><div class="mxv-h"><div class="mxv-w"><b>${esc(base)}</b>${rdS(base, r)}</div><div class="mxv-zh"></div><div class="mxv-l"><span class="mxgtag">${esc(gl)}</span></div></div><div class="mxv-use"><div><span class="mxusel">本句</span><b class="mxused">${esc(used)}</b>${ur ? `<span class="mxr">${esc(ur)}</span>` : ''}<span class="mxform">${esc(form)}</span></div></div></div>`; }).join('')}</div></div>`;
   // 文型
   if(m.g && m.g.length) h += `<div class="mxblk"><div class="mxlab">文型</div>${m.g.map(k => { const g = B.grammar[k]; if(!g) return '';
       const no = k.split('-')[1], ex = (g.main || g.ex || '').replace(/【[^】]*】/g, '').trim();
@@ -1334,6 +1335,10 @@ function mixInfoHTML(i){
 }
 /* 單語裡的動詞／形容詞：可展開的變化表（BOOK.mixForms，建置時產生並用詞典驗證），本句用到的那一形標紅 */
 const MXF = B.mixForms || {};
+const MXF_OPEN_KEY = 'nhStudy.mixFormsOpen';   // 變化表預設展開；收合後記住（獨立於 bunkaListen.v2）
+function mixFormsOpen(){ try{ return localStorage.getItem(MXF_OPEN_KEY) !== '0'; }catch(e){ return true; } }
+document.addEventListener('toggle', e => { const d = e.target; if(!d || !d.classList || !d.classList.contains('mxft')) return;
+  try{ localStorage.setItem(MXF_OPEN_KEY, d.open ? '1' : '0'); }catch(err){} }, true);
 const MXF_G = {I:'I類（五段）', II:'II類（一段）', III:'III類（不規則）', 'い':'い形容詞', 'な':'な形容詞'};
 function mixFormsHTML(w, m){
   const F = MXF[w]; if(!F) return '';
@@ -1356,7 +1361,7 @@ function mixFormsHTML(w, m){
     cand.sort((a, b) => b[0].length - a[0].length);
     for(const [p, k] of cand){ if(p && used.some(u => u.startsWith(p))){ hit = k; break; } }
   }
-  return `<details class="mxft"><summary>變化表<span class="mxgrp">${esc(MXF_G[F.g] || F.g)}</span></summary><div class="mxftab">${F.f.map(([lab, fu], k) => `<div class="mxfc${k===hit ? ' hit' : ''}"><span class="mxfl">${esc(lab)}</span><span class="mxfv">${furiHTML(fu)}</span></div>`).join('')}</div></details>`;
+  return `<details class="mxft"${mixFormsOpen() ? ' open' : ''}><summary>變化表</summary><div class="mxftab">${F.f.map(([lab, fu], k) => `<div class="mxfc${k===hit ? ' hit' : ''}"><span class="mxfl">${esc(lab)}</span><span class="mxfv">${furiHTML(fu)}</span></div>`).join('')}</div></details>`;
 }
 function mixSrcHTML(d, i){
   const m = MIX[i];
@@ -1755,7 +1760,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.29（綜合聽力測驗下拉重新排版：多句時每句配中文；單語整理成表格，動詞・形容詞直接標出本句用法，變化表可展開；文型句型醒目、例句與頁數分開）</div>
+  <div class="foot">版本 3.30（綜合聽力測驗解說：變化表預設展開（收合會記住）；動詞・形容詞整理成一張小卡，單語表在電腦上不再拉太寬）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
