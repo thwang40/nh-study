@@ -88,8 +88,60 @@ const FLOW = {}; B.lessons.forEach(l => FLOW[l.n] = flowOf(l.n));
 const FLOW_ALL = [].concat(...Object.keys(FLOW).sort((a,b)=>a-b).map(n=>FLOW[n]));
 const flowNav = d => { const p = FLOW_ALL.indexOf(d); return {prev: FLOW_ALL[p-1], next: FLOW_ALL[p+1]}; };
 const flowName = d => d.drill ? gLabel(d.drill) : d.src ? `第${d.l}課 ${d.src.label}「${d.title}」` : `實用會話 ${d.id}「${d.title}」`;
-function flowNavHTML(d){ const {prev, next} = flowNav(d); const href = x => x.drill ? `#/g/${x.drill}` : `#/d/${x.id}`;
-  return `<div class="row" style="margin-top:8px">${prev?`<a class="btn ghost" style="text-decoration:none" href="${href(prev)}" title="${esc(flowName(prev))}">‹ 上一項</a>`:''}${next?`<a class="btn ghost" style="text-decoration:none" href="${href(next)}" title="${esc(flowName(next))}">下一項 ›</a>`:''}</div>${next?`<div class="small mute">下一項：${esc(flowName(next))}</div>`:''}`; }
+function flowHref(d){ return d.drill ? `#/g/${d.drill}` : `#/d/${d.id}`; }
+function flowShortName(d){
+  if(d.drill){
+    const g = B.grammar[d.drill] || {};
+    const n = String(d.drill.split('-')[1] || '');
+    const t = g.t || g.p || '';
+    const m = t.match(/【([^】]+)】/);
+    let pat = m ? `【${m[1]}】` : (g.p || t);
+    if(pat.length > 30) pat = pat.slice(0, 29) + '…';
+    if(String(d.drill).startsWith('0-')) return (/^[0-9]/.test(n) ? `入門・文型${n} ` : '入門 ') + pat;
+    return `文型${n} ${pat}`;
+  }
+  if(d.src) return `${d.src.label} ${d.title}`.trim();
+  return `實用會話 ${d.title||d.id}`;
+}
+function nextLessonOf(n){
+  const ls = B.lessons, i = ls.findIndex(l => l.n===n);
+  return (i>=0 && ls[i+1]) ? ls[i+1] : null;
+}
+function flowNextInLesson(d){
+  const fl = FLOW[d.l] || [], i = fl.indexOf(d);
+  if(i < 0) return {prev:null, next:null, end:false};
+  return {prev: i>0 ? fl[i-1] : null, next: fl[i+1] || null, end: i===fl.length-1};
+}
+function lessonEndHTML(n){
+  const nxt = nextLessonOf(n);
+  const nxtLab = nxt ? (nxt.n===0 ? '入門' : `第${nxt.n}課 ${nxt.t}`) : '';
+  return `<div class="qend">
+    <div class="qend-t">🎉 本課結束</div>
+    <div class="small mute">本課的課本內容和實用會話都聽完了。</div>
+    <div class="row qend-btns">
+      <a class="btn alt" style="text-decoration:none" href="#/l/${n}">回到本課</a>
+      ${nxt?`<a class="btn qend-next" style="text-decoration:none" href="#/l/${nxt.n}">下一課：${esc(nxt.n===0?'入門':`第${nxt.n}課`)} ▶${nxt.t?`<span class="qend-sub">${esc(nxt.t)}</span>`:''}</a>`:`<a class="btn alt" style="text-decoration:none" href="#/">回到首頁</a>`}
+    </div>
+  </div>`;
+}
+function nextItemBtnHTML(next){
+  if(!next) return '';
+  return `<a class="btn qnext" style="text-decoration:none" href="${flowHref(next)}">下一個：${esc(flowShortName(next))} ▶</a>`;
+}
+function quizNavHTML(scope){
+  if(!scope || scope==='review') return '';
+  if(scope[0]==='L') return lessonEndHTML(+scope.slice(1));
+  const d = DLG[scope]; if(!d) return '';
+  if(d.tango){ const next = (FLOW[d.l]||[])[0]; return nextItemBtnHTML(next); }
+  if(d.tangoEx || d.split || d.situ) return '';
+  const {next, end} = flowNextInLesson(d);
+  if(end) return lessonEndHTML(d.l);
+  return nextItemBtnHTML(next);
+}
+function flowNavHTML(d){
+  const {prev, next, end} = flowNextInLesson(d);
+  return `<div class="row flownav">${prev?`<a class="btn ghost" style="text-decoration:none" href="${flowHref(prev)}">‹ 上一項</a>`:''}${nextItemBtnHTML(next)}</div>${end?lessonEndHTML(d.l):''}`;
+}
 const UNCERTAIN = {};
 const isText = d => !!d.src;
 const srcTag = d => d.src ? `課本原文・${d.src.label}・p.${d.src.page}` : '實用會話（自編）';
@@ -1160,10 +1212,12 @@ function finishQ(){
   const pct = Math.round(Q.score/Q.qs.length*100);
   if(DLG[Q.scope]){ S.quiz[Q.scope] = Math.max(S.quiz[Q.scope]||0, pct); S.done[Q.scope] = true; save(); }
   if(Q.scope[0]==='L'){ const n=+Q.scope.slice(1); B.dialogues.filter(d=>d.l===n).forEach(d=>{ if(S.quiz[d.id]==null) S.quiz[d.id]=pct; }); save(); }
+  const nav = quizNavHTML(Q.scope);
   $('#view').innerHTML = `<div class="crumb"><a href="${Q.back}">‹ ${esc(Q.backName)}</a></div>
   <h1>${esc(Q.title)}：結果</h1>
   <div class="card"><div style="font-size:40px;font-weight:800;color:${pct>=80?'var(--ok)':'var(--alert)'}">${pct}%</div><div>答對 ${Q.score} / ${Q.qs.length} 題</div>
-  <div class="row" style="margin-top:12px"><button class="btn" id="again">再測一次</button><a class="btn alt" style="text-decoration:none" href="#/review">📝 複習清單（${revCount()}）</a><a class="btn ghost" style="text-decoration:none" href="${Q.back}">回到${esc(Q.backName)}</a></div></div>`;
+  ${nav?`<div class="qnav">${nav}</div>`:''}
+  <div class="row" style="margin-top:12px"><button class="btn${nav?' alt':''}" id="again">再測一次</button><a class="btn alt" style="text-decoration:none" href="#/review">📝 複習清單（${revCount()}）</a><a class="btn ghost" style="text-decoration:none" href="${Q.back}">回到${esc(Q.backName)}</a></div></div>`;
   $('#again').onclick = () => viewQuiz(Q.scope);
 }
 
@@ -1450,7 +1504,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.19（電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.20（小測驗結果可跳到下一個聽力練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

@@ -679,3 +679,19 @@ a.card.qcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 12px
   .lhead-bar #playAllBtn{min-height:40px}
   .info-tip{width:32px;height:32px}
 }
+
+/* 小測驗結果／練習頁：下一個、本課結束 */
+.qnav{margin-top:14px}
+.qnav .qnext{display:flex;justify-content:center;width:100%;box-sizing:border-box;text-align:center;font-weight:800;line-height:1.35;padding:12px 16px}
+.qend{margin-top:4px;padding:14px 12px;background:var(--pale);border:1px solid var(--pale2);border-radius:14px;text-align:center}
+.qnav .qend{margin-top:0}
+.qend-t{font-size:22px;font-weight:800;color:var(--pri);margin-bottom:4px}
+.qend-btns{margin-top:10px;justify-content:center}
+.qend-btns .btn{line-height:1.35;text-align:center}
+.qend-next{display:inline-flex;flex-direction:column;align-items:center;gap:0;min-width:12em}
+.qend-sub{display:block;font-size:13px;font-weight:600;opacity:.9;margin-top:2px}
+.flownav{margin-top:12px;align-items:center}
+.flownav .qnext{margin-left:auto;font-weight:800;max-width:100%;line-height:1.35}
+@media (max-width:839px){
+  .flownav .qnext{flex:1 1 12em}
+}
