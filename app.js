@@ -20,13 +20,38 @@ if(!S.turns){ try{ const R = {}; Object.entries(S.review).forEach(([k, v]) => { 
   S.review = R; }catch(e){} S.turns = 1; save(); }
 if(!S.unf || typeof S.unf!=='object') S.unf = {};
 const DLG = {}; B.dialogues.forEach(d => DLG[d.id] = d);
-// 逐句聽力練習：同一個人一次說超過 3 句的輪次（data: ln.parts）→ 虛擬對話 <id>-s（一句一張卡片，音檔 audio/<id>-s_<k>.mp3）
+// 逐句聽力練習：同一個人一次說兩句以上的輪次（data: ln.parts）→ 虛擬對話 <id>-s（一句一張卡片，音檔 audio/<id>-s_<k>.mp3）
+// 複習 key 是 <id>-s:<index>。先放入舊規則（超過 3 句）已拆過的輪次，再附加新拆的，避免既有編號被往後擠。畫面與全部播放仍依課本輪次順序。
+const SPLIT_OLD = new Set([
+  "8-T1:0",
+  "10-T1:2",
+  "11-T2:1",
+  "12-T1:8",
+  "14-T1:1",
+  "14-T1:2",
+  "14-T2:2",
+  "15-T3:0",
+  "16-T3:15",
+  "17-T1:0",
+  "17-T1:1",
+  "17-T1:2",
+  "17-T1:3",
+  "17-T1:4",
+  "17-T1:5",
+  "17-T3:10",
+  "18-T1:0"
+]);
 const SPLITD = {};
-B.dialogues.forEach(d => { const lines = [], groups = [];
-  d.lines.forEach((ln, ti) => { if(!ln.parts || !ln.parts.length) return; const g = {ti, idx:[]};
+function pushSplitParts(d, lines, groups, pred){
+  d.lines.forEach((ln, ti) => { if(!ln.parts || !ln.parts.length) return; if(!pred(d, ti)) return; const g = {ti, idx:[]};
     ln.parts.forEach((p, j) => { g.idx.push(lines.length); lines.push({s:ln.s, ja:p.ja, kana:p.kana, zh:p.zh, g:p.g||[], v:p.v||[], part:[ti, j], lab:`${lineNo(d, ti).lab}之${j+1}`}); });
     groups.push(g); });
+}
+B.dialogues.forEach(d => { const lines = [], groups = [];
+  pushSplitParts(d, lines, groups, (d, ti) => SPLIT_OLD.has(d.id+':'+ti));
+  pushSplitParts(d, lines, groups, (d, ti) => !SPLIT_OLD.has(d.id+':'+ti));
   if(!lines.length) return;
+  groups.sort((a,b)=>a.ti-b.ti);
   const v = {id:d.id+'-s', l:d.l, title:d.title, scene:d.scene, sp:d.sp, src:d.src, split:d.id, lines, groups};
   SPLITD[d.id] = v; DLG[v.id] = v; });
 // 💬 場合使用：課外情境例句（非課本原文），每個本文 3 個情境 → 虛擬對話 <id>-x（音檔 audio/<id>-x_<k>.mp3，點開才下載）
@@ -1068,7 +1093,7 @@ function splitHTML(d){ const v = SPLITD[d.id]; if(!v) return '';
   const n = v.lines.length;
   return `<section class="splitsec" aria-label="逐句聽力練習" data-blk>
     <div class="splithead"><h2>🎧 逐句聽力練習</h2><button class="btn sm" data-act="dall" data-d="${v.id}">▶ 全部播放</button><span class="small mute">${n} 句</span>${blkBtn(false)}</div>
-    <div class="small mute">上面有人一次說超過三句，這裡拆成一句一句聽。點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。</div>
+    <div class="small mute">上面有人一次說兩句以上，這裡拆成一句一句聽。點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。</div>
     ${v.groups.map(g => { const ln = d.lines[g.ti];
       return `<div class="splitgrp"><div class="splitsrc"><span class="spk ${ln.s}">${esc(d.sp[ln.s].name)}</span> ${esc(lineNo(d, g.ti).lab)}（共 ${g.idx.length} 句）・課本 p.${d.src ? d.src.page : ''}</div>
         <div class="lines">${g.idx.map(k => lineHTML(v, k)).join('')}</div></div>`; }).join('')}
@@ -1399,7 +1424,7 @@ document.addEventListener('click', e => {
   else if(act==='bshow'){ e.preventDefault(); blockShow(b); }
   else if(act==='srcclose'){ closeSrc(b.dataset.k, b.classList.contains('bot')); }
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = (+el.dataset.lv + 1) % 3; el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
-  else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } playSeq(d, d.lines.map((_,i)=>i)); }
+  else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } const idxs = (d.split && d.groups) ? d.groups.flatMap(g=>g.idx) : d.lines.map((_,i)=>i); playSeq(d, idxs); }
   else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
   else if(act==='ill'){ openIll(b.dataset.d, +b.dataset.j); }
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
@@ -1504,7 +1529,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.20（小測驗結果可跳到下一個聽力練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.20（小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
