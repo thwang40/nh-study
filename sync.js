@@ -24,6 +24,7 @@
   let syncing = false;
   let pending = false;
   let debounceT = 0;
+  let localGen = 0; // bumps on every local save; detects edits made during a sync
   let applying = false;
   let errMsg = '';
   let started = false;
@@ -144,6 +145,7 @@
     const S = getS();
     if (!S || !root.SyncMerge) return;
     syncing = true;
+    const genAtStart = localGen;
     errMsg = '';
     refreshPanels();
     try {
@@ -157,13 +159,21 @@
         return out;
       });
       applying = true;
+      let changedDuring = false;
       try {
-        root.SyncMerge.applyToLocal(S, merged);
+        // A tap (e.g. 🙋 加入複習) during the transaction changed S after it was packed: keep it.
+        changedDuring = localGen !== genAtStart;
+        const finalState = changedDuring ? root.SyncMerge.rebase(S, merged) : merged;
+        const before = root.SyncMerge.visibleSig(S);
+        root.SyncMerge.applyToLocal(S, finalState);
         appSave(true);
-        if (root.NhApp && typeof root.NhApp.refreshView === 'function') root.NhApp.refreshView();
+        const after = root.SyncMerge.visibleSig(S);
+        // Only re-render when the cloud actually brought something new; keeps revealed text and open 出處 panels.
+        if (before !== after && root.NhApp && typeof root.NhApp.refreshView === 'function') root.NhApp.refreshView();
+        else if (root.NhApp && typeof root.NhApp.updateChips === 'function') root.NhApp.updateChips();
       } finally { applying = false; }
       lastSynced = Date.now();
-      pending = false;
+      pending = changedDuring;
     } catch (e) {
       pending = true;
       errMsg = (e && (e.message || e.code)) ? String(e.message || e.code) : '同步失敗';
@@ -183,6 +193,7 @@
   }
 
   function notifyLocalChange() {
+    localGen++;
     if (!configReady() || isPreview()) return;
     if (!user || applying) return;
     pending = true;

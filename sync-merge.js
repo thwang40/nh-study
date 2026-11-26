@@ -192,5 +192,17 @@
     return merged;
   }
 
-  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer };
+  // What the UI shows (live keys + quiz scores). Used to skip re-rendering when a sync changed nothing visible.
+  function visibleSig(S) {
+    const live = o => Object.keys(o || {}).filter(k => (o || {})[k]).sort().join('|');
+    const q = Object.keys((S && S.quiz) || {}).sort().map(k => k + '=' + S.quiz[k]).join('|');
+    return [live(S && S.review), live(S && S.unf), live(S && S.done), q].join('#');
+  }
+  // Local edits made while a cloud transaction was in flight are not in `merged`.
+  // Re-merge the current local state on top so they are never overwritten.
+  function rebase(S, merged, now) {
+    return merge(packLocal(S, now), merged);
+  }
+
+  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer, visibleSig, rebase };
 });

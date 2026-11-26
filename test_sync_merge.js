@@ -286,4 +286,48 @@ t('revCount-style union (review ∪ unf) stays consistent after merge', () => {
   assert.strictEqual(count, 5); // r1,r2,r3,u1,u2
 });
 
+
+// JLA-5: 🙋 on a 單語 card during/just before a sync
+t('tango review added while a sync transaction is in flight survives (rebase)', () => {
+  const S = localS({ review: { 't12:3': { n: 1, t: 1000, why: '我不會' } } });
+  const packedAtStart = M.packLocal(S, 2000);
+  const cloud = { review: { '11-T2:0': { n: 1, t: 1500, why: 'quiz', updatedAt: 1500 } }, unf: {}, done: {}, quiz: {}, updatedAt: 1500 };
+  const merged = M.merge(packedAtStart, cloud);
+  // user taps 🙋 on 第12課 單語8 (t12:7) and an example (t12e:21) while the transaction runs
+  S.review['t12:7'] = { n: 1, t: 3000, why: '我不會' };
+  S.unf['t12e:21'] = 3001;
+  const finalState = M.rebase(S, merged, 3002);
+  M.applyToLocal(S, finalState);
+  assert.ok(S.review['t12:7'], 't12:7 kept locally');
+  assert.ok(S.review['t12:3'] && S.review['11-T2:0']);
+  assert.ok(S.unf['t12e:21']);
+  // and the next push carries it to the cloud
+  const next = M.merge(M.packLocal(S, 4000), cloud);
+  assert.ok(next.review['t12:7'] && !next.review['t12:7'].deleted);
+});
+
+t('without rebase the in-flight tap would be lost (documents the old bug)', () => {
+  const S = localS({ review: {} });
+  const merged = M.merge(M.packLocal(S, 2000), M.emptyPacked());
+  S.review['t12:7'] = { n: 1, t: 3000, why: '我不會' };
+  M.applyToLocal(S, merged);
+  assert.ok(!S.review['t12:7']);
+});
+
+t('fresh tango review beats an older tombstone from another device', () => {
+  const S = localS({ review: { 't12:7': { n: 1, t: 5000, why: '我不會' } } });
+  const cloud = { review: { 't12:7': { deleted: true, updatedAt: 4000 } }, unf: {}, done: {}, quiz: {}, updatedAt: 4000 };
+  const out = M.merge(M.packLocal(S, 6000), cloud);
+  assert.ok(out.review['t12:7'] && !out.review['t12:7'].deleted);
+});
+
+t('visibleSig unchanged when sync brings nothing new (no re-render)', () => {
+  const S = localS({ review: { 't12:7': { n: 1, t: 3000, why: '我不會' } }, unf: { 't12e:1': 9 }, quiz: { t12: 80 } });
+  const before = M.visibleSig(S);
+  M.applyToLocal(S, M.merge(M.packLocal(S, 4000), M.packLocal(JSON.parse(JSON.stringify(S)), 4000)));
+  assert.strictEqual(M.visibleSig(S), before);
+  S.review['5-T1:0'] = { n: 1, t: 1, why: 'x' };
+  assert.notStrictEqual(M.visibleSig(S), before);
+});
+
 console.log('\n' + passed + ' tests passed');

@@ -476,7 +476,7 @@ function tangoCropSrc(n, pg){ return `pages/tango/${n}-p${pg}.webp`; }
 function viewTango(n){
   const T = (B.tango||{})[n], d = DLG['t'+n], L = LESSON[n];
   if(!T || !d || !L) return viewHome();
-  renderSide(n); reveal = {};
+  renderSide(n); if(!keepReveal) reveal = {};
   current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
   const pgs = tangoPages(n);
   const words = d.lines.map((ln,i)=>({ln,i})).filter(x=>x.ln.kind!=='expr');
@@ -690,7 +690,7 @@ function toggleTangoPage(n, pg){
 }
 function viewLesson(n){
   const L = LESSON[n]; if(!L) return viewHome();
-  renderSide(n); reveal = {};
+  renderSide(n); if(!keepReveal) reveal = {};
   current = {type:'review', keys: FLOW[n].flatMap(d => d.lines.map((_,i)=>d.id+':'+i))};
   const gs = Object.entries(B.grammar).filter(([k,g])=>g.l===n);
   const playHelp = '「全部播放」會依課本頁序再接著實用會話，一句一句播完整課（不含本課單語）。';
@@ -780,7 +780,7 @@ function drillRowHTML(d, i, P){
 function viewDrill(k){
   const d = DRILL[k]; if(!d) return viewHome();
   const g = B.grammar[k], n = d.l, L = LESSON[n];
-  renderSide(n); reveal = {};
+  renderSide(n); if(!keepReveal) reveal = {};
   current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › <a href="#/l/${n}">${n?`第${n}課 `:''}${esc(L.t)}</a> › ${n?'同文型練習':esc(g.p)}</div>
@@ -1096,7 +1096,7 @@ function openIll(id, j){
 function viewDialogue(id){
 
   const d = DLG[id]; if(!d) return viewHome();
-  renderSide(d.l); reveal = {};
+  renderSide(d.l); if(!keepReveal) reveal = {};
   const L = LESSON[d.l]; const ds = B.dialogues.filter(x=>x.l===d.l); const pos = ds.indexOf(d);
   current = {type:'dlg', d, idxs: d.lines.map((_,i)=>i)};
   $('#view').innerHTML = `
@@ -1174,7 +1174,7 @@ function viewReview(){
   const {unf, rev} = revKeys(); const revOnly = rev.filter(k=>!S.unf[k]);
   const keys = unf.concat(revOnly);
   current = {type:'review', keys};
-  reveal = {};
+  if(!keepReveal) reveal = {};
   const card = k => { const [id,i]=k.split(':'); return lineHTML(DLG[id], +i, {review:true, showId:true}); };
   $('#view').innerHTML = `
   <div class="crumb"><a href="#/">首頁</a> › 複習清單</div>
@@ -1557,7 +1557,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.22（單語圖示可調小／中／大，預設中・第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.23（修正：按 🙋 後幾秒自動收起・單語圖示可調小／中／大，預設中・第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -1702,13 +1702,26 @@ function route(){
   if(pendingHL) setTimeout(applyHL, 60);
 }
 /* 雲端合併後立刻重畫目前頁面與側欄（不關掉設定、不把捲動跳回頂端；播放中只更新計數以免中斷）。 */
+let keepReveal = false; // refreshView re-renders the same page: keep what the user revealed
 function refreshView(){
   const y = window.scrollY;
   if(typeof curPlaying!=='undefined' && curPlaying){
     updateChips();
     return;
   }
-  renderRoute();
+  // remember UI state that a re-render would reset
+  const savedReveal = Object.assign({}, reveal);
+  const openSrcKeys = [...document.querySelectorAll('.srcbox[id^="src-"]')].filter(sb => sb.innerHTML.trim()).map(sb => { const s = sb.id.slice(4), j = s.lastIndexOf('_'); return s.slice(0, j)+':'+s.slice(j+1); });
+  const openTex = [...document.querySelectorAll('.tcard')].map((c, n) => { const dt = c.querySelector('details.tex'); return dt && dt.open ? n : -1; }).filter(n => n >= 0);
+  const openDet = [...document.querySelectorAll('details[data-blk], details.situgrp')].map((dt, n) => dt.open ? n : -1).filter(n => n >= 0);
+  keepReveal = true;
+  try{ reveal = savedReveal; renderRoute(); } finally { keepReveal = false; }
+  const cards = document.querySelectorAll('.tcard');
+  openTex.forEach(n => { const c = cards[n]; const dt = c && c.querySelector('details.tex'); if(dt){ dt.open = true; syncTexChev(c); } });
+  const dets = document.querySelectorAll('details[data-blk], details.situgrp');
+  openDet.forEach(n => { if(dets[n]) dets[n].open = true; });
+  if(document.querySelector('.tlist')) syncTexAllBtn();
+  openSrcKeys.forEach(k => { const [id, i] = k.split(':'); const d = DLG[id]; if(!d || !lineEl(k)) return; openSrc(d, +i); });
   updateChips();
   window.scrollTo(0, y);
 }
