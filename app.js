@@ -1326,9 +1326,23 @@ function mixInfoHTML(i){
       const gl = k==='v' ? (VGRP[g0] || g0) + gx : (grp==='な' ? 'な形容詞' : 'い形容詞');
       return `<div class="mxv card2"><div class="mxv-h"><div class="mxv-w"><b>${esc(base)}</b>${rdS(base, r)}</div><div class="mxv-zh"></div><div class="mxv-l"><span class="mxgtag">${esc(gl)}</span></div></div><div class="mxv-use"><div><span class="mxusel">本句</span><b class="mxused">${esc(used)}</b>${ur ? `<span class="mxr">${esc(ur)}</span>` : ''}<span class="mxform">${esc(form)}</span></div></div></div>`; }).join('')}</div></div>`;
   // 文型
-  if(m.g && m.g.length) h += `<div class="mxblk"><div class="mxlab">文型</div>${m.g.map(k => { const g = B.grammar[k]; if(!g) return '';
-      const no = k.split('-')[1], ex = (g.main || g.ex || '').replace(/【[^】]*】/g, '').trim();
-      return `<a class="mxg" href="${DRILL[k] ? '#/g/'+k : '#/l/'+g.l}"><div class="mxg-p"><span class="gpat">【${esc(g.p)}】</span></div>${ex && ex!==g.p ? `<div class="mxg-ex">${esc(ex)}</div>` : ''}<div class="mxg-meta"><span class="mxpill">${esc(lsName(g.l))}・文型${esc(no)}${g.pg ? `・p.${g.pg}` : ''}</span><span class="mxg-zh">${esc(g.zh||'')}</span></div></a>`; }).join('')}</div>`;
+  if(m.g && m.g.length){
+    // v3.31：文型小卡（同單語卡）：標題＋課次 → 意思 → 本句（用到文型的部分紅字、漢字上方假名）→ 課本例句（可播）
+    const GM = (B.mixGM || [])[i] || {}, GX = B.mixG || {};
+    const mk = f => furiHTML(f).replace(/〔/g, '<b class="mxgm">').replace(/〕/g, '</b>');
+    h += `<div class="mxblk"><div class="mxlab">文型</div><div class="mxgl">${m.g.map(k => { const g = B.grammar[k]; if(!g) return '';
+      const no = k.split('-')[1], gx = GX[k] || {}, href = DRILL[k] ? '#/g/'+k : '#/l/'+g.l;
+      const sen = GM[k] || (m.furi || '').replace(/[【】]/g, '');
+      const plain = f => (f || '').replace(/《[^》]*》|[〔〕【】\s　]/g, '');
+      const same = gx.ex2 && plain(gx.ex) === plain(sen);   // 本句剛好就是課本例句 → 改用另一句課本例句
+      const ex = (same ? gx.ex2 : gx.ex) || (g.main || g.ex || '').replace(/[【】]/g, ''), xi = same ? gx.i2 : gx.i;
+      const play = DRILL[k] && xi != null && DRILL[k].lines[xi] ? `<button class="mxgplay" data-act="play" data-d="g${esc(k)}" data-i="${xi}" aria-label="播放課本例句">▶</button>` : '';
+      return `<div class="mxg card2"><a class="mxg-h" href="${href}"><span class="gpat">【${esc(g.p)}】</span><span class="mxpill">${esc(lsName(g.l))}・文型${esc(no)}${g.pg ? `・p.${g.pg}` : ''}</span><span class="mxg-go">›</span></a>`
+        + (g.zh ? `<div class="mxg-row"><span class="mxusel">意思</span><span class="mxg-zh">${esc(g.zh)}</span></div>` : '')
+        + `<div class="mxg-row"><span class="mxusel">本句</span><span class="mxg-s">${mk(sen)}</span></div>`
+        + (ex ? `<div class="mxg-row mxg-exr"><span class="mxusel">課本例句</span><span class="mxg-ex">${mk(ex)}</span>${play}</div>` : '')
+        + `</div>`; }).join('')}</div></div>`;
+  }
   if(m.n) h += `<div class="mxblk"><div class="mxlab">補充</div><div class="mxnote">${esc(m.n)}</div></div>`;
   h += `<div class="mxls">難度 ${MIX_LV[m.lv||'m']}・用到 ${(m.ls||[]).map(lsName).join('・')}・本句屬於${lsName(m.l)}</div>`;
   return h + `</div>`;
@@ -1760,7 +1774,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.30（綜合聽力測驗解說：變化表預設展開（收合會記住）；動詞・形容詞整理成一張小卡，單語表在電腦上不再拉太寬）</div>
+  <div class="foot">版本 3.31（綜合聽力測驗解說：文型改成小卡——意思、本句用到的部分標紅並加假名、課本例句可播放）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

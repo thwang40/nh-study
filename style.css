@@ -871,3 +871,23 @@ a.card.mxhome>div:nth-child(2){flex:1;min-width:0}
   .mxv-w .mxr{display:block;margin-left:0;line-height:1.3}
   .mxv-w .mxr::before,.mxv-w .mxr::after{content:''}
 }
+
+/* v3.31 綜合聽力測驗：文型小卡（同單語卡風格） */
+.mxgl{max-width:720px}
+.mxg.card2{display:block;background:#f8faf6;border:1px solid #e3eadf;border-radius:10px;padding:8px 10px;margin:6px 0;border-bottom:1px solid #e3eadf}
+.mxg.card2:last-child{border-bottom:1px solid #e3eadf}
+.mxg-h{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;text-decoration:none;color:inherit}
+.mxg-h .gpat{font-weight:700;font-size:15px;color:var(--alert);background:none;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.mxg-h .mxpill{margin-left:auto}
+.mxg-go{color:var(--mute);font-size:16px;line-height:1}
+.mxg-row{display:flex;align-items:baseline;gap:6px;margin-top:5px;font-size:13px;color:#444;line-height:1.9}
+.mxg-row .mxusel{flex:0 0 auto;min-width:4.6em;margin-right:0}
+.mxg-row>span:nth-child(2){min-width:0;overflow-wrap:anywhere}
+.mxg-zh{font-size:13px;color:#444}
+.mxg-s{font-size:15px;color:#222}
+.mxg-ex{font-size:13px;color:#555}
+.mxg-row rt{font-size:.55em;color:var(--mute)}
+.mxgm{color:var(--alert);font-weight:700}
+.mxgm rt{color:var(--alert);font-weight:400}
+.mxgplay{flex:0 0 auto;margin-left:auto;border:1px solid var(--line);background:#fff;color:var(--pri);border-radius:999px;width:26px;height:26px;font-size:11px;line-height:1;cursor:pointer;padding:0}
+@media (max-width:480px){.mxg-row .mxusel{min-width:4.2em}.mxg-s{font-size:14px}}
