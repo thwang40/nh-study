@@ -1775,7 +1775,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.32（綜合聽力測驗文型小卡：出處（第幾課・文型・頁）放最上面、課本例句移到本句上方、不再用紅色粗體）</div>
+  <div class="foot">版本 3.33（綜合聽力測驗句庫擴充：每課每級至少 20 句，共 1157 句，含離線音檔）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
