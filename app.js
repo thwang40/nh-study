@@ -10,6 +10,19 @@ function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
 // (Older versions saved listenFirst:false in localStorage, which made every page open with the text shown.)
 S.listenFirst = true;
 function save(){ try{ const o = Object.assign({}, S); delete o.listenFirst; localStorage.setItem(LS_KEY, JSON.stringify(o)); }catch(e){} updateChips(); if(!save._quiet && window.NhSync) window.NhSync.notifyLocalChange(); }
+const TIMG_SIZE_KEY = 'nhStudy.tangoImgSize'; // 單語圖示大小；獨立儲存，不寫入 bunkaListen.v2
+function loadTangoImgSize(){ try{ const v = localStorage.getItem(TIMG_SIZE_KEY); if(v==='sm'||v==='md'||v==='lg') return v; }catch(e){} return 'md'; }
+let tangoImgSize = loadTangoImgSize();
+function tangoImgSizeHTML(){
+  const lab = {sm:'小', md:'中', lg:'大'};
+  return `<span class="timgsz-wrap"><span class="timgsz-lab">圖示</span><div class="seg timgsz" role="group" aria-label="圖示大小">${['sm','md','lg'].map(sz => `<button type="button" data-act="timgsz" data-sz="${sz}" class="${tangoImgSize===sz?'on':''}">${lab[sz]}</button>`).join('')}</div></span>`;
+}
+function applyTangoImgSize(){
+  document.querySelectorAll('.tlist').forEach(el => { el.classList.remove('timg-sm','timg-md','timg-lg'); el.classList.add('timg-'+tangoImgSize); });
+  document.querySelectorAll('[data-act="timgsz"]').forEach(b => b.classList.toggle('on', b.dataset.sz===tangoImgSize));
+}
+function setTangoImgSize(sz){ if(sz!=='sm'&&sz!=='md'&&sz!=='lg') sz='md'; tangoImgSize = sz; try{ localStorage.setItem(TIMG_SIZE_KEY, sz); }catch(e){} applyTangoImgSize(); }
+
 try{ if(JSON.parse(localStorage.getItem(LS_KEY)||'{}').listenFirst !== undefined) save(); }catch(e){}
 // v3.1: default speed is 1x; reset once anyone who was left on the old 0.7x setting.
 if(S.spd1 !== 1){ S.speed = 1; S.spd1 = 1; try{ save(); }catch(e){} }
@@ -491,10 +504,11 @@ function viewTango(n){
   <div class="player lhead-bar">
     <button class="btn sm" id="playAllBtn">▶ 全部播放</button>${infoTipHTML(playHelp)}${speedSegHTML()}
     <label class="texopt"><input type="checkbox" id="tangoExPlayCb" ${S.tangoExPlay!==false?'checked':''}> 含例句（單語＋3 句）</label>
+    ${tangoImgSizeHTML()}
   </div>
   <div class="small nowp" id="nowPlaying"></div>
   </div>
-  <div class="tlist" data-blk>
+  <div class="tlist timg-${tangoImgSize}" data-blk>
     <div class="blkbar">${blkBtn(false)}<button class="btn sm ghost" data-act="texall">展開全部例句</button></div>
     <h2 class="th2">単語　たんご</h2>
     ${group(words)}
@@ -650,7 +664,7 @@ function tangoRowHTML(d, i){
   const chev = hasEx ? `<button type="button" class="texchev" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"></button>` : '';
   const src = tangoImgSrc(d, i);
   const imgOpen = !!tangoImgOpen[key];
-  const imgBtn = src ? `<button type="button" class="timg${imgOpen?' on':''}" data-act="tangoimg" data-k="${key}" aria-expanded="${imgOpen?'true':'false'}" aria-label="放大插圖" title="點一下放大"><img src="${src}" alt="" decoding="async" width="56" height="56" onerror="const b=this.closest('.timg'); if(b) b.hidden=true; const x=document.getElementById('timg-${key.replace(':','_')}'); if(x) x.remove();"></button>` : '';
+  const imgBtn = src ? `<button type="button" class="timg${imgOpen?' on':''}" data-act="tangoimg" data-k="${key}" aria-expanded="${imgOpen?'true':'false'}" aria-label="放大插圖" title="點一下放大"><img src="${src}" alt="" decoding="async" width="160" height="160" onerror="const b=this.closest('.timg'); if(b) b.hidden=true; const x=document.getElementById('timg-${key.replace(':','_')}'); if(x) x.remove();"></button>` : '';
   const imgBox = src ? `<div class="timgbox${imgOpen?' open':''}" id="timg-${key.replace(':','_')}" data-for="${key}"><img src="${src}" alt="" decoding="async" data-act="tangoimg" data-k="${key}"></div>` : '';
   return `<div class="line srow trow twd${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tleft"><div class="tnum">${esc(ln.lab||String(i+1))}</div>${imgBtn}</div>
@@ -1444,6 +1458,7 @@ document.addEventListener('click', e => {
   else if(act==='pgcache'){ b.dataset.l==='b' ? cacheLessonPages('b', +b.dataset.a, +b.dataset.b) : cacheLessonPages(+b.dataset.l); }
   else if(act==='tangopg'){ toggleTangoPage(+b.dataset.n, +b.dataset.pg); }
   else if(act==='texall'){ const box = b.closest('.tlist') || document; const dts = [...box.querySelectorAll('details.tex')]; const open = dts.some(d => !d.open); dts.forEach(d => { d.open = open; const c = d.closest('.tcard'); if(c) syncTexChev(c); }); syncTexAllBtn(); }
+  else if(act==='timgsz'){ e.preventDefault(); setTangoImgSize(b.dataset.sz); }
   else if(act==='tangoimg'){ e.preventDefault(); const k = b.dataset.k; if(!k) return; tangoImgOpen[k] = !tangoImgOpen[k]; const on = !!tangoImgOpen[k]; const box = document.getElementById('timg-'+k.replace(':','_')); if(box) box.classList.toggle('open', on); document.querySelectorAll(`.timg[data-k="${k}"]`).forEach(x => { x.classList.toggle('on', on); x.setAttribute('aria-expanded', on?'true':'false'); }); if(on && box){ const r = box.getBoundingClientRect(); if(r.bottom > innerHeight) box.scrollIntoView({block:'nearest', behavior:'smooth'}); } }
   else if(act==='texone'){ e.preventDefault(); const card = b.closest('.tcard'); const dt = card && card.querySelector('details.tex'); if(dt){ dt.open = !dt.open; syncTexChev(card); syncTexAllBtn(); } }
   else if(act==='playhelp'){ e.preventDefault(); toast(b.dataset.tip || b.title || '說明'); }
@@ -1542,7 +1557,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.21（第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.22（單語圖示可調小／中／大，預設中・第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

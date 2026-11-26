@@ -582,26 +582,44 @@ body.has-pside .script.has-ill > .srow{max-width:calc(100% - min(34%, 260px) - 1
   .srow.trow .stext{grid-column:2;grid-row:1;min-height:36px}
   .srow.trow .sbtns{grid-column:3;grid-row:1;align-self:start;padding-top:4px}
 }
-/* 單語記憶插圖：號碼左邊、圖在號碼右側，文字隱藏時也看得到；點一下在卡片內放大（不全螢幕） */
+/* 單語記憶插圖：號碼左邊、圖在號碼右側；圖示大小 小／中／大（預設中），點一下在卡片內放大（不全螢幕） */
+.tlist{--timg:110px}
+.tlist.timg-sm{--timg:56px}
+.tlist.timg-md{--timg:110px}
+.tlist.timg-lg{--timg:160px}
 .srow.trow.twd{grid-template-columns:auto minmax(0,1fr) auto}
 .trow .tleft{display:flex;align-items:center;gap:8px;flex:none;min-width:0}
 .tcard .twd .tleft .tnum{padding-top:0;min-width:1.4em;line-height:1}
-button.timg{width:56px;height:56px;padding:0;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden;cursor:zoom-in;flex:none;line-height:0;box-shadow:0 1px 2px #0000000d}
-button.timg img{width:56px;height:56px;object-fit:cover;display:block;background:#f7f4ec}
+button.timg{width:var(--timg);height:var(--timg);padding:0;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden;cursor:zoom-in;flex:none;line-height:0;box-shadow:0 1px 2px #0000000d}
+button.timg img{width:var(--timg);height:var(--timg);object-fit:cover;display:block;background:#f7f4ec}
 button.timg.on{outline:2px solid var(--teal);outline-offset:1px;cursor:zoom-out}
 button.timg:hover,button.timg:focus-visible{box-shadow:0 0 0 3px #1d643422}
 .timgbox{display:none;padding:8px 12px 12px;background:#f4f7f2;border-top:1px solid var(--line)}
 .timgbox.open{display:block}
-.timgbox img{display:block;width:min(100%,320px);height:auto;margin:0 auto;border-radius:12px;cursor:zoom-out;background:#fff}
+.timgbox img{display:block;width:min(100%,480px);height:auto;margin:0 auto;border-radius:12px;cursor:zoom-out;background:#fff}
 .srow.trow.twd .stext .ja{white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .srow.trow.twd .stext .zh{word-break:keep-all;overflow-wrap:break-word}
+.timgsz-wrap{display:inline-flex;align-items:center;gap:6px}
+.timgsz-lab{font-size:13px;color:var(--mute);font-weight:700}
+.seg.timgsz button{min-height:32px;padding:4px 10px;font-size:13px}
 @media (max-width:560px){
+  .tlist.timg-sm{--timg:52px}
+  .tlist.timg-md{--timg:88px}
+  .tlist.timg-lg{--timg:120px}
   .srow.trow.twd{grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
   .srow.trow.twd .tleft{grid-column:1;grid-row:1;align-self:start;flex-direction:column;align-items:center;gap:3px}
   .srow.trow.twd .tleft .tnum{padding-top:0;font-size:15px}
   .srow.trow.twd .stext{grid-column:2;grid-row:1;align-self:start;padding-top:2px;min-width:0}
   .srow.trow.twd .sbtns{grid-column:3;grid-row:1;align-self:start;padding-top:0}
-  button.timg,button.timg img{width:52px;height:52px}
+  /* 中／大：圖在左、文字在右，按鈕改到文字下方，避免 390px 擠在一起 */
+  .tlist.timg-md .srow.trow.twd,
+  .tlist.timg-lg .srow.trow.twd{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto}
+  .tlist.timg-md .srow.trow.twd .tleft,
+  .tlist.timg-lg .srow.trow.twd .tleft{grid-column:1;grid-row:1 / span 2}
+  .tlist.timg-md .srow.trow.twd .stext,
+  .tlist.timg-lg .srow.trow.twd .stext{grid-column:2;grid-row:1}
+  .tlist.timg-md .srow.trow.twd .sbtns,
+  .tlist.timg-lg .srow.trow.twd .sbtns{grid-column:2;grid-row:2;justify-self:start;padding-top:4px}
 }
 
 .srow.exrow .stext .ja{overflow-wrap:break-word;word-break:keep-all}
