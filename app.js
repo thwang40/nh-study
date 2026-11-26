@@ -113,6 +113,35 @@ function registerTangoEx(){
   });
 }
 registerTangoEx();
+/* 單語頁動詞變化聽力（v3.36）：BOOK.vf（vforms.js）→ 虛擬對話 vf<j>，音檔 audio/vf<j>_<k>.mp3；只在單語頁用，不進複習／測驗 */
+(B.vf || []).forEach((v, j) => { DLG['vf'+j] = {id:'vf'+j, l:0, vf:true, title:v.w+' 動詞變化', scene:'', sp:{A:{name:'動詞變化', voice:'f'}},
+  lines: v.f.map(f => ({s:'A', ja:f[2], furi:f[1], kana:f[3], zh:f[0], say:f[2], lab:f[0], g:[], v:[]}))}; });
+const VF_GL = {I:'I 類（五段）', II:'II 類（一段）', III:'III 類（不規則）'};
+const vfReveal = {};   // 只存在記憶體，不寫入 bunkaListen.v2
+function vfJ(n, no){ const m = ((B.vfMap||{})[n]||{}); return m[no]; }
+function vfTextHTML(j, k){
+  const ln = DLG['vf'+j].lines[k], on = !!vfReveal['vf'+j+':'+k];
+  if(!on) return maskHTML(ln.ja);
+  return `<span class="ja">${furiHTML(ln.furi)}</span>${S.showKana && ln.kana !== ln.ja ? `<span class="kana">${esc(ln.kana)}</span>` : ''}`;
+}
+function vfRowHTML(j, k){
+  const key = 'vf'+j+':'+k, ln = DLG['vf'+j].lines[k], on = !!vfReveal[key];
+  return `<div class="vfrow${curPlaying===key?' playing':''}" data-key="${key}"><span class="vflab">${esc(ln.lab)}</span>
+    <span class="vftx${on?'':' masked'}" data-act="vfrv" data-k="${key}" role="button" tabindex="0" aria-label="${on?'隱藏':'顯示日文'}">${vfTextHTML(j, k)}</span>
+    <button class="ibtn s" data-act="play" data-d="vf${j}" data-i="${k}" aria-label="播放" title="播放">🔊</button></div>`;
+}
+function vfBlockHTML(n, no){
+  const j = vfJ(n, no); if(j === undefined || !DLG['vf'+j]) return '';
+  const v = B.vf[j], d = DLG['vf'+j], all = d.lines.every((_, k) => vfReveal['vf'+j+':'+k]);
+  return `<details class="vfd" data-j="${j}"><summary class="vfsum">🔤 動詞變化・聽力練習 <span class="vfg">${esc(VF_GL[v.g]||v.g)}・${d.lines.length} 種</span></summary>
+    <div class="vfbar"><button type="button" class="btn sm" data-act="vfall" data-j="${j}">▶ 依序播放</button><button type="button" class="btn sm ghost" data-act="vfshow" data-j="${j}">${all?'🙈 全部隱藏':'👁 全部顯示'}</button><span class="small mute">先聽，再點灰條看答案</span></div>
+    <div class="vflist">${d.lines.map((_, k) => vfRowHTML(j, k)).join('')}</div></details>`;
+}
+function vfRerender(j){
+  document.querySelectorAll(`details.vfd[data-j="${j}"]`).forEach(dt => {
+    dt.querySelectorAll('.vfrow').forEach(r => { const k = +r.dataset.key.split(':')[1]; const t = document.createElement('div'); t.innerHTML = vfRowHTML(j, k); r.replaceWith(t.firstElementChild); });
+    const all = DLG['vf'+j].lines.every((_, k) => vfReveal['vf'+j+':'+k]); const b = dt.querySelector('[data-act="vfshow"]'); if(b) b.textContent = all ? '🙈 全部隱藏' : '👁 全部顯示'; }); }
+function vfSetAll(j, on){ DLG['vf'+j].lines.forEach((_, k) => { if(on) vfReveal['vf'+j+':'+k] = 1; else delete vfReveal['vf'+j+':'+k]; }); vfRerender(j); }
 /* 綜合聽力測驗（v3.26）：句庫 BOOK.mix（mix.js）→ 虛擬對話 mx，音檔 audio/mx_<i>.mp3，複習 key mx:<i>（append-only，走既有同步） */
 const MIX = B.mix || [];
 const MIX_LV = {e:'簡單', m:'中等', h:'難'};
@@ -217,11 +246,13 @@ function stopAll(){
 }
 function setPlaying(key){
   curPlaying = key;
-  document.querySelectorAll('.line.playing,.dline.playing').forEach(e=>e.classList.remove('playing'));
+  document.querySelectorAll('.line.playing,.dline.playing,.vfrow.playing').forEach(e=>e.classList.remove('playing'));
+  if(key && key.startsWith('vf')){ const r = document.querySelector(`.vfrow[data-key="${key}"]`); if(r){ r.classList.add('playing'); const dt = r.closest('details'); if(dt && !dt.open) dt.open = true; const t = r.getBoundingClientRect().top; if(t > innerHeight-80 || t < 90) r.scrollIntoView({block:'center', behavior:'smooth'}); } }
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); const dt = el && el.closest('details'); if(dt && !dt.open) dt.open = true; const card = el && el.closest('.tcard'); if(card){ syncTexChev(card); syncTexAllBtn(); } if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
-  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.mix ? '綜合聽力測驗' : d.tangoEx ? `第${d.l}課 單語例句` : d.tango ? `第${d.l}課 單語 p.${d.lines[+i]&&d.lines[+i].pg||''}` : d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
+  document.querySelectorAll('[data-act="vfall"]').forEach(b => b.textContent = key && key.startsWith('vf'+b.dataset.j+':') ? '⏹ 停止' : '▶ 依序播放');
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.vf ? '動詞變化' : d.mix ? '綜合聽力測驗' : d.tangoEx ? `第${d.l}課 單語例句` : d.tango ? `第${d.l}課 單語 p.${d.lines[+i]&&d.lines[+i].pg||''}` : d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -497,7 +528,7 @@ function viewTango(n){
       }
       html += `<div class="tcard${ln.kind==='expr'?' tcard-expr':''}">`;
       html += tangoRowHTML(d, i);
-      if(ln.kind !== 'expr') html += tangoExBlockHTML(n, ln.no);
+      if(ln.kind !== 'expr') html += tangoExBlockHTML(n, ln.no) + vfBlockHTML(n, ln.no);
       html += `</div>`;
     });
     return html;
@@ -1050,6 +1081,7 @@ function blockShow(b){
   const box = b.closest('[data-blk]'); if(!box) return; const on = !b.classList.contains('on');
   if(box.tagName==='DETAILS' && on) box.open = true;
   box.querySelectorAll('details.tex').forEach(dt => { dt.open = on; const c = dt.closest('.tcard'); if(c) syncTexChev(c); });
+  [...new Set([...box.querySelectorAll('details.vfd')].map(dt => +dt.dataset.j))].forEach(j => vfSetAll(j, on));
   syncTexAllBtn();
   const mine = el => el.parentElement.closest('[data-blk]') === box;
   [...box.querySelectorAll('.line[data-key]')].filter(mine).forEach(el => { const k = el.dataset.key, [id, i] = k.split(':');
@@ -1654,6 +1686,9 @@ document.addEventListener('click', e => {
   const act = b.dataset.act;
   if(/^mx/.test(act) && act!=='mx'){ mixAct(act, b, e); return; }
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
+  else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(+k.slice(2).split(':')[0]); }
+  else if(act==='vfshow'){ const j = +b.dataset.j; vfSetAll(j, !DLG['vf'+j].lines.every((_, k) => vfReveal['vf'+j+':'+k])); }
+  else if(act==='vfall'){ const j = +b.dataset.j, d = DLG['vf'+j]; if(curPlaying && curPlaying.startsWith('vf'+j+':')){ stopAll(); setPlaying(null); } else playSeq(d, d.lines.map((_, k) => k), 600); }
   else if(act==='rep'){ playSeq(DLG[b.dataset.d], [+b.dataset.i], 900, 3); toast('重複 3 次'); }
   else if(act==='rv'){ const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
   else if(act==='idk'){
@@ -1707,6 +1742,7 @@ async function audioList(){
   Object.keys(B.tango || {}).forEach(n => { const T = B.tango[n]; (T.lines||[]).forEach((_, i) => add(`audio/t${n}_${i}`)); });
   Object.entries(B.tangoEx || {}).forEach(([n, items]) => (items||[]).forEach((_, i) => add(`audio/t${n}e_${i}`)));
   (B.mix || []).forEach((_, i) => add(`audio/mx_${i}`));
+  (B.vf || []).forEach((v, j) => v.f.forEach((_, k) => add(`audio/vf${j}_${k}`)));
   Object.entries(window.RP || {}).forEach(([did, m]) => Object.entries(m).forEach(([i, v]) => v[1].forEach((_, a) => add(`audio/${did}-r_${i}_${a}`))));
   return [...new Set(L)];
 }
@@ -1776,7 +1812,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.35（第13～15課單語插圖 160 張）</div>
+  <div class="foot">版本 3.36（單語頁動詞變化聽力：57 個動詞、每個最多 20 種變化，先聽再看）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
