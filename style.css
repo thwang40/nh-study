@@ -917,3 +917,20 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .vftx .ja{font-size:17px;display:block}
 .vftx .kana{font-size:12px;color:#6b7a66;display:block}
 .vfrow .ibtn.s{flex:none}
+
+/* v3.37 單語：例句展開鈕加大、收合時顯示待複習句數 */
+.texchev{width:auto;min-width:44px;height:40px;padding:0 10px 0 8px;border:1px solid var(--pale2);background:#fff;color:var(--teal);display:inline-flex;align-items:center;gap:4px;border-radius:10px;font-size:13px;font-weight:700;margin-left:4px}
+.texchev::before{content:"▸";font-size:20px;line-height:1}
+.texchev:hover,.texchev:focus-visible{background:var(--pale);border-color:var(--pri)}
+.tcard:has(details.tex[open]) .texchev,.texchev[aria-expanded="true"]{background:var(--pale);border-color:var(--pri)}
+.texchev.rev{border-color:#e6a23c}
+.texrevb{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:11px;background:#e6a23c;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;margin-left:4px}
+.texrevb[hidden]{display:none}
+.tcard:has(details.tex[open]) .texrevb{display:none}
+.tcard.has-exrev{border-color:#e6a23c;border-right:4px solid #e6a23c}
+.tcard.has-exrev:has(details.tex[open]){border-right-width:1px}
+@media (max-width:560px){
+  .texchev{min-width:44px;height:40px;padding:0 8px 0 6px}
+  .tlist.timg-sm .srow.trow.twd .sbtns{flex-wrap:wrap;justify-content:flex-end;max-width:150px;row-gap:4px}
+}
+.tcard.has-exrev .twd .sbtns{opacity:1}

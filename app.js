@@ -503,7 +503,7 @@ function tangoLessonCard(n){
   <a class="card tango-card qcard ${q.cls}" href="#/t/${n}" style="text-decoration:none">
     <div class="qcard-main">
     <div class="lnum"><span class="badge txt">單語</span> ${T.source||'官方單語表'} p.${(T.pages&&T.pages.length)?(T.pages[0]+'–'+T.pages[T.pages.length-1]):''}</div>
-    <div class="ltitle">先聽再看・第${n}課單語</div>
+    <div class="ltitle">單語</div>
     <div class="small mute">${nw} 個單語（各 3 句例句）${ne?`＋${ne} 句「いろいろな表現」`:''}</div>
     <div class="small mute" style="margin-top:2px">點進去先聽語音，再點文字看日文、假名與中文。每個單語附 3 句聽力例句。</div>
     </div>${q.side}
@@ -526,7 +526,7 @@ function viewTango(n){
         last = ln.pg;
         html += `<div class="tpg">p.${ln.pg}<button type="button" class="ibtn s tpgbtn" data-act="tangopg" data-n="${n}" data-pg="${ln.pg}" aria-label="看單語表 p.${ln.pg}" title="單語表這頁">📖</button></div>`;
       }
-      html += `<div class="tcard${ln.kind==='expr'?' tcard-expr':''}">`;
+      html += `<div class="tcard${ln.kind==='expr'?' tcard-expr':''}${ln.kind!=='expr' && texRevCount(n, ln.no) ? ' has-exrev' : ''}">`;
       html += tangoRowHTML(d, i);
       if(ln.kind !== 'expr') html += tangoExBlockHTML(n, ln.no) + vfBlockHTML(n, ln.no);
       html += `</div>`;
@@ -656,6 +656,22 @@ function tangoExBlockHTML(n, wordNo){
   if(!idxs.length) return '';
   return `<details class="tex"><summary class="texsr">聽力句子</summary><div class="texlines">${idxs.map(i => tangoExRowHTML(ed, i)).join('')}</div></details>`;
 }
+// 收合時也看得出來：這個單語底下有幾句例句被勾「還不熟悉」（只讀 S.unf，不改資料）
+function texRevCount(n, wordNo){
+  const ed = DLG['t'+n+'e']; if(!ed) return 0;
+  let c = 0; ed.lines.forEach((ln, i) => { if(ln.w === wordNo && S.unf[ed.id+':'+i]) c++; });
+  return c;
+}
+function texRevBadgeHTML(c){ return `<span class="texrevb"${c?'':' hidden'} title="底下例句有 ${c} 句待複習">待複習 ${c}</span>`; }
+function syncTexRev(card){
+  if(!card) return;
+  const row = card.querySelector('.twd'); const m = row && (row.dataset.key||'').match(/^t(\d+):(\d+)$/); if(!m) return;
+  const ln = (DLG['t'+m[1]]||{lines:[]}).lines[+m[2]]; if(!ln) return;
+  const c = texRevCount(m[1], ln.no);
+  card.classList.toggle('has-exrev', c > 0);
+  const b = card.querySelector('.texrevb'); if(b){ b.hidden = !c; b.textContent = '待複習 '+c; b.title = `底下例句有 ${c} 句待複習`; }
+  const ch = card.querySelector('.texchev'); if(ch) ch.classList.toggle('rev', c > 0);
+}
 function tangoHasEx(d, ln){
   if(!d || !ln || ln.kind==='expr') return false;
   const ed = DLG['t'+d.l+'e'];
@@ -700,7 +716,8 @@ function tangoRowHTML(d, i){
   const body = lv>=1 ? `<div class="ja">${jaHTML}</div>${kanaHTML?`<div class="kana">${kanaHTML}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
   const hasEx = tangoHasEx(d, ln);
   const open = hasEx && texCardOpen(key);
-  const chev = hasEx ? `<button type="button" class="texchev" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"></button>` : '';
+  const revC = hasEx ? texRevCount(d.l, ln.no) : 0;
+  const chev = hasEx ? `${texRevBadgeHTML(revC)}<button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>` : '';
   const src = tangoImgSrc(d, i);
   const imgOpen = !!tangoImgOpen[key];
   const imgBtn = src ? `<button type="button" class="timg${imgOpen?' on':''}" data-act="tangoimg" data-k="${key}" aria-expanded="${imgOpen?'true':'false'}" aria-label="放大插圖" title="點一下放大"><img src="${src}" alt="" decoding="async" width="160" height="160" onerror="const b=this.closest('.timg'); if(b) b.hidden=true; const x=document.getElementById('timg-${key.replace(':','_')}'); if(x) x.remove();"></button>` : '';
@@ -1725,7 +1742,7 @@ document.addEventListener('change', e => {
   const k = cb.dataset.uf;
   if(cb.checked) S.unf[k] = Date.now(); else { if(window.SyncMerge) SyncMerge.tomb(S,'unf',k); delete S.unf[k]; }
   save();
-  document.querySelectorAll(`.line[data-key="${k}"]`).forEach(el => el.classList.toggle('unf', cb.checked));
+  document.querySelectorAll(`.line[data-key="${k}"]`).forEach(el => { el.classList.toggle('unf', cb.checked); if(el.classList.contains('exrow')) syncTexRev(el.closest('.tcard')); });
   const sl = document.querySelector('#side a[href="#/review"]'); if(sl) sl.textContent = `📝 複習清單（${revCount()}）`;
   toast(cb.checked ? '已標記：還不熟悉（在複習清單）' : '已取消標記');
   if(current && current.type==='review' && !cb.checked){ const y = scrollY; viewReview(); window.scrollTo(0, y); }
@@ -1812,7 +1829,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.36（單語頁動詞變化聽力：57 個動詞、每個最多 20 種變化，先聽再看）</div>
+  <div class="foot">版本 3.37（單語卡片改名、例句箭頭加大、收合時顯示「待複習」句數）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
