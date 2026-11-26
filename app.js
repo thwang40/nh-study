@@ -91,7 +91,7 @@ Object.entries(B.drills||{}).forEach(([k, items]) => { const g = B.grammar[k]; i
     sp:{A:{name:'女',voice:'f'}, B:{name:'男',voice:'m'}},
     lines: items.map(it => ({s: it.v[0]==='m'?'B':'A', ja:it.ja, kana:it.kana, zh:it.zh, g:[k], v:[], x:it.x||null, pg:it.pg, tag:it.tag}))};
   DRILL[k] = d; DLG[d.id] = d; });
-/* 單語（目前先做第12課）：虛擬對話 t12，音檔 audio/t12_<i>.mp3，複習 key 為 t12:i，可走既有同步 */
+/* 單語（第10・12課）：虛擬對話 t12，音檔 audio/t12_<i>.mp3，複習 key 為 t12:i，可走既有同步 */
 function registerTango(){
   Object.entries(B.tango || {}).forEach(([n, T]) => {
     const id = 't' + n;
@@ -1557,7 +1557,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.23（修正：按 🙋 後幾秒自動收起・單語圖示可調小／中／大，預設中・第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.24（新增第10課單語：58詞＋6表現・例句・插圖・修正：按 🙋 後幾秒自動收起・單語圖示可調小／中／大，預設中・第12課單語有記憶插圖・小測驗結果可跳到下一個聽力練習・兩句以上就有逐句練習・電腦版課程頁標題列更緊湊・本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
