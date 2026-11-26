@@ -1,4 +1,4 @@
-const SHELL = 'nh-shell-v73', AUDIO = 'nh-audio-v9', PAGES = 'nh-pages-v1';
+const SHELL = 'nh-shell-v74', AUDIO = 'nh-audio-v9', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','tango.js','tango-ex.js','ill.js','sec.js','blk.js','firebase-config.js','sync-merge.js','sync-auth.js','sync.js','auth-callback.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'].concat(["pages/ill2/1-T1_0.webp", "pages/ill2/1-T2_0.webp", "pages/ill2/1-T3_0.webp", "pages/ill2/1-T3_1.webp", "pages/ill2/10-T1_0.webp", "pages/ill2/10-T2_0.webp", "pages/ill2/11-T1_0.webp", "pages/ill2/11-T2_0.webp", "pages/ill2/11-T3_0.webp", "pages/ill2/12-T1_0.webp", "pages/ill2/12-T2_0.webp", "pages/ill2/12-T2_1.webp", "pages/ill2/12-T2_2.webp", "pages/ill2/12-T2_3.webp", "pages/ill2/12-T2_4.webp", "pages/ill2/2-T1_0.webp", "pages/ill2/2-T1_1.webp", "pages/ill2/2-T1_2.webp", "pages/ill2/2-T1_3.webp", "pages/ill2/2-T1_4.webp", "pages/ill2/2-T1_5.webp", "pages/ill2/2-T1_6.webp", "pages/ill2/2-T1_7.webp", "pages/ill2/2-T2_0.webp", "pages/ill2/3-T1_0.webp", "pages/ill2/3-T1_1.webp", "pages/ill2/4-T2_0.webp", "pages/ill2/4-T2_1.webp", "pages/ill2/5-T1_0.webp", "pages/ill2/5-T2_0.webp", "pages/ill2/5-T2_1.webp", "pages/ill2/5-T2_2.webp", "pages/ill2/6-T1_0.webp", "pages/ill2/6-T1_1.webp", "pages/ill2/6-T1_2.webp", "pages/ill2/6-T1_3.webp", "pages/ill2/6-T1_4.webp", "pages/ill2/6-T2_0.webp", "pages/ill2/6-T2_1.webp", "pages/ill2/6-T2_2.webp", "pages/ill2/6-T3_0.webp", "pages/ill2/6-T3_1.webp", "pages/ill2/6-T3_2.webp", "pages/ill2/6-T3_3.webp", "pages/ill2/6-T3_4.webp", "pages/ill2/6-T3_5.webp", "pages/ill2/7-T1_0.webp", "pages/ill2/7-T1_1.webp", "pages/ill2/7-T2_0.webp", "pages/ill2/7-T2_1.webp", "pages/ill2/7-T2_2.webp", "pages/ill2/7-T3_0.webp", "pages/ill2/7-T3_1.webp", "pages/ill2/8-T1_0.webp", "pages/ill2/8-T1_1.webp", "pages/ill2/8-T2_0.webp", "pages/ill2/9-T1_0.webp", "pages/ill2/9-T2_0.webp", "pages/ill2/9-T2_1.webp", "pages/ill2/9-T3_0.webp", "pages/ill2/9-T3_1.webp"]);
 self.window = self; importScripts('data.js'); importScripts('tango.js'); importScripts('tango-ex.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));
@@ -31,6 +31,8 @@ self.addEventListener('activate', e => {
     }
     // v3.22 one-time purge: only when upgrading from a shell older than v71 (240px 單語插圖); later updates keep the image cache
     const pre322 = (await caches.keys()).some(k => { const m = /^nh-shell-v(\d+)$/.exec(k); return m && +m[1] < 71; });
+    // v3.25: 第10課 #21・#29 插圖重畫；從 v74 以前升級時只刪這兩張舊圖
+    const pre325 = (await caches.keys()).some(k => { const m = /^nh-shell-v(\d+)$/.exec(k); return m && +m[1] < 74; });
     for (const k of await caches.keys()) if (![SHELL, AUDIO, PAGES].includes(k)) await caches.delete(k);
     if (pre322 && await caches.has(PAGES)) {
       const pc = await caches.open(PAGES);
@@ -39,6 +41,11 @@ self.addEventListener('activate', e => {
     if (pre322 && await caches.has(SHELL)) {
       const sc = await caches.open(SHELL);
       for (const r of await sc.keys()) if (/\/pages\/tango\/img\//.test(new URL(r.url).pathname)) await sc.delete(r);
+    }
+    if (pre325) for (const name of [PAGES, SHELL]) {
+      if (!(await caches.has(name))) continue;
+      const pc = await caches.open(name);
+      for (const r of await pc.keys()) if (/\/pages\/tango\/img\/10-(20|28)\.webp$/.test(new URL(r.url).pathname)) await pc.delete(r);
     }
     await self.clients.claim();
     cacheAudio().catch(() => {});
