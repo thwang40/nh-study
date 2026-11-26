@@ -596,13 +596,13 @@ function viewLesson(n){
   <div class="row" style="margin:6px 0"><span class="small mute">課本 p.${L.pages[0]}–${L.pages[1]}</span><a class="btn sm" style="text-decoration:none" href="#/p/${L.n}/0">📄 課本頁面（${L.pages[1]-L.pages[0]+1} 頁）</a></div>
   ${playerHTML(true)}
   <div class="small" id="nowPlaying" style="min-height:1.2em;margin:-4px 0 4px"></div>
-  <div class="small mute" style="margin:0 0 8px">「全部播放」會依下面的順序（課本頁序 → 實用會話）一句一句播完整課。</div>
+  <div class="small mute" style="margin:0 0 8px">「全部播放」會依課本頁序再接著實用會話，一句一句播完整課（不含本課單語）。</div>
   ${lessonQuizSummaryHTML(n)}
+  ${B.tango && B.tango[n] ? tangoLessonCard(n) : ''}
   <h2>📖 課本內容（依課本頁序${n?'：本文＋文型':''}）</h2>
   <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
   ${n?`<h2>🎧 實用會話（依本課文型自編）</h2>
   <div class="dlist">${FLOW[n].filter(d=>!d.drill&&!isText(d)).map(fCard).join('')}</div>`:''}
-  ${B.tango && B.tango[n] ? tangoLessonCard(n) : ''}
   <div class="row" style="margin-top:10px"><a class="btn" style="text-decoration:none" href="#/q/L${n}">✏️ ${lessonLabel(n)} 聽力測驗</a></div>
   ${pagesSection(L)}
   <details ${gs.length<=0?'':''}><summary>📚 ${n?'本課文型':'入門項目'}（${gs.length}）</summary><div class="gl">${gs.map(([k,g])=>gItemHTML(k,g)).join('')}</div></details>
@@ -1438,7 +1438,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.17（課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
+  <div class="foot">版本 3.18（本課單語放在課本內容上方・課程頁可一眼看出小測驗進度・第12課單語各附 3 句聽力例句・可用 Google 登入跨裝置同步複習清單與進度・第1～18課・文型📖課本截圖・🔍搜尋與聽力模式・🗣開口練習）・資料儲存在本裝置；登入同一個 Google 帳號即可同步，不會清除既有清單。</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
