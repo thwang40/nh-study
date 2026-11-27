@@ -127,7 +127,7 @@
   }
 
   function packedForCloud(packed) {
-    return {
+    const doc = {
       review: packed.review || {},
       unf: packed.unf || {},
       done: packed.done || {},
@@ -135,6 +135,15 @@
       updatedAt: packed.updatedAt || Date.now(),
       syncedAt: Date.now()
     };
+    if (packed.mine && Object.keys(packed.mine).length) doc.mine = packed.mine;   // 我的單語（v3.39）
+    return doc;
+  }
+  // 我的單語：app.js 提供 window.NhMine = { store(), save(quiet), refresh() }
+  function mineApi() { return root.NhMine && root.SyncMerge && root.SyncMerge.packMine ? root.NhMine : null; }
+  function packAll(S) {
+    const p = root.SyncMerge.packLocal(S);
+    const M = mineApi(); if (M) p.mine = root.SyncMerge.packMine(M.store());
+    return p;
   }
 
   async function syncNow(reason) {
@@ -153,7 +162,7 @@
       const merged = await mods.runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
         const cloud = snap.exists() ? snap.data() : root.SyncMerge.emptyPacked();
-        const out = root.SyncMerge.merge(root.SyncMerge.packLocal(S), cloud);
+        const out = root.SyncMerge.merge(packAll(S), cloud);
         const doc = packedForCloud(out);
         tx.set(ref, doc);
         return out;
@@ -164,10 +173,13 @@
         // A tap (e.g. 🙋 加入複習) during the transaction changed S after it was packed: keep it.
         changedDuring = localGen !== genAtStart;
         const finalState = changedDuring ? root.SyncMerge.rebase(S, merged) : merged;
-        const before = root.SyncMerge.visibleSig(S);
+        const M = mineApi();
+        if (M && changedDuring) finalState.mine = root.SyncMerge.mergeMine(root.SyncMerge.packMine(M.store()), merged.mine);
+        const before = root.SyncMerge.visibleSig(S) + '#' + (M ? root.SyncMerge.mineSig(M.store()) : '');
         root.SyncMerge.applyToLocal(S, finalState);
+        if (M && finalState.mine) { root.SyncMerge.applyMine(M.store(), finalState.mine); M.save(true); }
         appSave(true);
-        const after = root.SyncMerge.visibleSig(S);
+        const after = root.SyncMerge.visibleSig(S) + '#' + (M ? root.SyncMerge.mineSig(M.store()) : '');
         // Only re-render when the cloud actually brought something new; keeps revealed text and open 出處 panels.
         if (before !== after && root.NhApp && typeof root.NhApp.refreshView === 'function') root.NhApp.refreshView();
         else if (root.NhApp && typeof root.NhApp.updateChips === 'function') root.NhApp.updateChips();

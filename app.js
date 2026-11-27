@@ -119,29 +119,193 @@ registerTangoEx();
 const VF_GL = {I:'I 類（五段）', II:'II 類（一段）', III:'III 類（不規則）'};
 const vfReveal = {};   // 只存在記憶體，不寫入 bunkaListen.v2
 function vfJ(n, no){ const m = ((B.vfMap||{})[n]||{}); return m[no]; }
-function vfTextHTML(j, k){
-  const ln = DLG['vf'+j].lines[k], on = !!vfReveal['vf'+j+':'+k];
+function vfTextHTML(vid, k){
+  const ln = DLG[vid].lines[k], on = !!vfReveal[vid+':'+k];
   if(!on) return maskHTML(ln.ja);
   return `<span class="ja">${furiHTML(ln.furi)}</span>${S.showKana && ln.kana !== ln.ja ? `<span class="kana">${esc(ln.kana)}</span>` : ''}`;
 }
-function vfRowHTML(j, k){
-  const key = 'vf'+j+':'+k, ln = DLG['vf'+j].lines[k], on = !!vfReveal[key];
+function vfRowHTML(vid, k){
+  const key = vid+':'+k, ln = DLG[vid].lines[k], on = !!vfReveal[key];
   return `<div class="vfrow${curPlaying===key?' playing':''}" data-key="${key}"><span class="vflab">${esc(ln.lab)}</span>
-    <span class="vftx${on?'':' masked'}" data-act="vfrv" data-k="${key}" role="button" tabindex="0" aria-label="${on?'隱藏':'顯示日文'}">${vfTextHTML(j, k)}</span>
-    <button class="ibtn s" data-act="play" data-d="vf${j}" data-i="${k}" aria-label="播放" title="播放">🔊</button></div>`;
+    <span class="vftx${on?'':' masked'}" data-act="vfrv" data-k="${key}" role="button" tabindex="0" aria-label="${on?'隱藏':'顯示日文'}">${vfTextHTML(vid, k)}</span>
+    <button class="ibtn s" data-act="play" data-d="${vid}" data-i="${k}" aria-label="播放" title="播放">🔊</button></div>`;
+}
+function vfDetailsHTML(vid, glab){
+  const d = DLG[vid]; if(!d) return '';
+  const all = d.lines.every((_, k) => vfReveal[vid+':'+k]);
+  return `<details class="vfd" data-j="${vid}"><summary class="vfsum">🔤 動詞變化・聽力練習 <span class="vfg">${esc(glab)}・${d.lines.length} 種</span></summary>
+    <div class="vfbar"><button type="button" class="btn sm" data-act="vfall" data-j="${vid}">▶ 依序播放</button><button type="button" class="btn sm ghost" data-act="vfshow" data-j="${vid}">${all?'🙈 全部隱藏':'👁 全部顯示'}</button><span class="small mute">先聽，再點灰條看答案</span></div>
+    <div class="vflist">${d.lines.map((_, k) => vfRowHTML(vid, k)).join('')}</div></details>`;
 }
 function vfBlockHTML(n, no){
   const j = vfJ(n, no); if(j === undefined || !DLG['vf'+j]) return '';
-  const v = B.vf[j], d = DLG['vf'+j], all = d.lines.every((_, k) => vfReveal['vf'+j+':'+k]);
-  return `<details class="vfd" data-j="${j}"><summary class="vfsum">🔤 動詞變化・聽力練習 <span class="vfg">${esc(VF_GL[v.g]||v.g)}・${d.lines.length} 種</span></summary>
-    <div class="vfbar"><button type="button" class="btn sm" data-act="vfall" data-j="${j}">▶ 依序播放</button><button type="button" class="btn sm ghost" data-act="vfshow" data-j="${j}">${all?'🙈 全部隱藏':'👁 全部顯示'}</button><span class="small mute">先聽，再點灰條看答案</span></div>
-    <div class="vflist">${d.lines.map((_, k) => vfRowHTML(j, k)).join('')}</div></details>`;
+  const v = B.vf[j]; return vfDetailsHTML('vf'+j, VF_GL[v.g]||v.g);
 }
-function vfRerender(j){
-  document.querySelectorAll(`details.vfd[data-j="${j}"]`).forEach(dt => {
-    dt.querySelectorAll('.vfrow').forEach(r => { const k = +r.dataset.key.split(':')[1]; const t = document.createElement('div'); t.innerHTML = vfRowHTML(j, k); r.replaceWith(t.firstElementChild); });
-    const all = DLG['vf'+j].lines.every((_, k) => vfReveal['vf'+j+':'+k]); const b = dt.querySelector('[data-act="vfshow"]'); if(b) b.textContent = all ? '🙈 全部隱藏' : '👁 全部顯示'; }); }
-function vfSetAll(j, on){ DLG['vf'+j].lines.forEach((_, k) => { if(on) vfReveal['vf'+j+':'+k] = 1; else delete vfReveal['vf'+j+':'+k]; }); vfRerender(j); }
+function vfRerender(vid){
+  document.querySelectorAll(`details.vfd[data-j="${vid}"]`).forEach(dt => {
+    dt.querySelectorAll('.vfrow').forEach(r => { const k = +r.dataset.key.split(':')[1]; const t = document.createElement('div'); t.innerHTML = vfRowHTML(vid, k); r.replaceWith(t.firstElementChild); });
+    const all = DLG[vid].lines.every((_, k) => vfReveal[vid+':'+k]); const b = dt.querySelector('[data-act="vfshow"]'); if(b) b.textContent = all ? '🙈 全部隱藏' : '👁 全部顯示'; }); }
+function vfSetAll(vid, on){ if(!DLG[vid]) return; DLG[vid].lines.forEach((_, k) => { if(on) vfReveal[vid+':'+k] = 1; else delete vfReveal[vid+':'+k]; }); vfRerender(vid); }
+/* ---------------- 我的單語（v3.39） ----------------
+   使用者自己輸入的字，存在獨立的 localStorage key nhStudy.mine（不寫入 bunkaListen.v2）：
+     { items:{ [id]:{ja,kana,zh,note,pos,t(建立),u(更新)} }, tomb:{ [id]: 刪除時間 } }
+   同步：sync.js 把它放在雲端 users/{uid}.mine，以 id 合併、較新者勝、刪除用 tombstone（sync-merge.js packMine/applyMine）。
+   虛擬對話：my_<id>（單語，1 行）、mye_<id>（3 句例句）、myf_<id>（動詞變化）。
+   音檔：mine.js（BOOK.mine，bake_mine.py 產生）有配好的才用 audio/my_<id>_0.mp3 等；沒有就用裝置內建日文語音（d.tts）。
+   複習：key my_<id>:0、mye_<id>:<k>，走既有的 unf/review 同步。 */
+const MY_KEY = 'nhStudy.mine';
+const MY = (() => { try{ const o = JSON.parse(localStorage.getItem(MY_KEY)||'{}') || {};
+  return {items: (o.items && typeof o.items==='object') ? o.items : {}, tomb: (o.tomb && typeof o.tomb==='object') ? o.tomb : {}}; }catch(e){ return {items:{}, tomb:{}}; } })();
+const MY_POS = {'':'未指定', n:'名詞', v1:'動詞 I 類（五段）', v2:'動詞 II 類（一段）', v3:'動詞 III 類（する・来る）', ai:'い形容詞', na:'な形容詞', adv:'副詞', ex:'表現・句子', x:'其他'};
+const MY_G = {v1:'I', v2:'II', v3:'III'};
+let myFormFor = null;   // null＝沒開表單；''＝新增；id＝修改
+function mySave(quiet){ try{ localStorage.setItem(MY_KEY, JSON.stringify(MY)); }catch(e){ toast('儲存失敗（裝置空間不足？）'); } if(!quiet && window.NhSync) window.NhSync.notifyLocalChange(); }
+function myList(){ return Object.keys(MY.items).map(id => Object.assign({id}, MY.items[id])).sort((a, b) => (b.t||0) - (a.t||0)); }
+function myBaked(id, it){ const b = (B.mine||{})[id]; return (b && it && b.k === it.kana && (b.ja||'') === (it.ja||'')) ? b : null; }
+function myRegister(){
+  Object.keys(DLG).forEach(k => { if(/^my[ef]?_/.test(k)) delete DLG[k]; });
+  const sp = {A:{name:'我的單語', voice:'f'}};
+  Object.keys(MY.items).forEach(id => {
+    const it = MY.items[id], b = myBaked(id, it);
+    const ja = it.ja || it.kana;
+    DLG['my_'+id] = {id:'my_'+id, l:0, mine:true, myId:id, tts: !(b && b.w), title:'我的單語', scene:'', sp,
+      lines:[{s:'A', ja, kana:it.kana, zh:it.zh||'', say:it.kana, g:[], v:[], note:it.note||''}]};
+    if(b && b.ex && b.ex.length) DLG['mye_'+id] = {id:'mye_'+id, l:0, mine:true, myEx:true, myId:id, tts:false, title:'我的單語例句', scene:'', sp,
+      lines: b.ex.map((e, k) => ({s:'A', ja:e.ja, furi:e.furi||'', kana:e.kana||'', zh:e.zh||'', say:e.ja, ex:k+1, w:id, g:[], v:[]}))};
+    const g = MY_G[it.pos], forms = g && window.MineCore ? MineCore.conjugate(it.ja, it.kana, g) : null;
+    if(forms && forms.length) DLG['myf_'+id] = {id:'myf_'+id, l:0, mine:true, myForms:true, myId:id, tts: !(b && b.nf === forms.length && b.g === g), title:ja+' 動詞變化', scene:'', sp,
+      lines: forms.map(f => ({s:'A', ja:f[2], furi:f[1], kana:f[3], zh:f[0], say:f[3], lab:f[0], g:[], v:[]}))};
+  });
+}
+myRegister();
+function myAudioIds(){
+  const out = [];
+  Object.keys(MY.items).forEach(id => { const b = myBaked(id, MY.items[id]); if(!b) return;
+    if(b.w) out.push(`audio/my_${id}_0`);
+    (b.ex||[]).forEach((_, k) => out.push(`audio/mye_${id}_${k}`));
+    for(let k = 0; k < (b.nf||0); k++) out.push(`audio/myf_${id}_${k}`); });
+  return out;
+}
+window.NhMine = { store: () => MY, save: quiet => { mySave(quiet); myRegister(); } };
+function myRowHTML(d){
+  const id = d.myId, it = MY.items[id] || {}, ln = d.lines[0], key = d.id+':0', lv = (reveal[key]||0);
+  const kanaLine = ln.kana && ln.kana !== ln.ja ? `<div class="kana">${esc(ln.kana)}</div>` : '';
+  const body = lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${kanaLine}${lv>=2?`<div class="zh">${esc(ln.zh)}${it.pos?` <span class="mypos">${esc(MY_POS[it.pos]||'')}</span>`:''}</div>${ln.note?`<div class="mynote">💡 ${esc(ln.note)}</div>`:''}`:''}` : maskHTML(ln.ja);
+  const ed = DLG['mye_'+id];
+  const revC = ed ? ed.lines.filter((_, k) => S.unf[ed.id+':'+k]).length : 0;
+  const open = ed && texCardOpen(key);
+  const ctl = ed ? `<span class="texctl"><button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>${texRevBadgeHTML(revC)}</span>`
+    : `<span class="texctl"><span class="mypend" title="跟我說「我的單語有新字」，就會配上自然語音和 3 句例句">${d.tts?'裝置語音・':''}例句準備中</span></span>`;
+  return `<div class="line srow trow twd myrow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
+    <div class="tleft"><div class="tnum">${d.myN||''}</div></div>
+    <div class="twmain"><div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>${ctl}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="0" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="0" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="myedit" data-id="${id}" aria-label="修改這個字" title="修改／刪除">✏️</button></div>
+  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
+}
+function myCardHTML(it){
+  const id = it.id, d = DLG['my_'+id]; if(!d) return '';
+  const ed = DLG['mye_'+id], fd = DLG['myf_'+id];
+  const revC = ed ? ed.lines.filter((_, k) => S.unf[ed.id+':'+k]).length : 0;
+  return `<div class="tcard mycard${revC?' has-exrev':''}" data-my="${id}">${myRowHTML(d)}
+    ${ed ? `<details class="tex"><summary class="texsr">聽力句子</summary><div class="texlines">${ed.lines.map((_, k) => tangoExRowHTML(ed, k)).join('')}</div></details>` : ''}
+    ${fd ? vfDetailsHTML(fd.id, (VF_GL[MY_G[it.pos]]||'') + (fd.tts ? '・裝置語音' : '')) : ''}
+    ${myFormFor === id ? myFormHTML(it) : ''}</div>`;
+}
+function mySrcHTML(d, i){
+  const it = MY.items[d.myId] || {}, ln = d.lines[i] || {};
+  let h = `<div class="src"><div>⭐ <b>我的單語</b>（自己輸入的字，不是課本內容）</div>
+    <div style="margin-top:4px"><b>${esc(it.ja||it.kana||'')}</b>${it.ja && it.ja!==it.kana ? `（${esc(it.kana)}）` : ''}＝${esc(it.zh||'')}${it.pos ? ` <em>${esc(MY_POS[it.pos]||'')}</em>` : ''}</div>`;
+  if(d.myEx) h += `<div class="small" style="margin-top:4px">例句 ${i+1}：<span class="ja">${ln.furi ? furiHTML(ln.furi) : esc(ln.ja)}</span>${ln.kana ? `<br><span class="mute">${esc(ln.kana)}</span>` : ''}<br>${esc(ln.zh)}</div>`;
+  if(d.myForms) h += `<div class="small" style="margin-top:4px">${esc(ln.lab||'')}：${furiHTML(ln.furi)}（${esc(ln.kana)}）</div>`;
+  if(it.note) h += `<div class="small srtip">💡 ${esc(it.note)}</div>`;
+  return h + `</div>`;
+}
+function myFormHTML(it){
+  it = it || {}; const id = it.id || '';
+  const v = k => esc(it[k] || '');
+  return `<form class="myform" data-id="${id}" autocomplete="off">
+    <div class="myf-h">${id ? '✏️ 修改單語' : '＋ 新增單語'}</div>
+    <div class="myf-grid">
+      <label><span>日文（漢字，可空白）</span><input name="ja" lang="ja" maxlength="40" placeholder="例：散歩" value="${v('ja')}"></label>
+      <label><span>假名（必填）</span><input name="kana" lang="ja" maxlength="40" placeholder="例：さんぽ" value="${v('kana')}"></label>
+      <label><span>中文</span><input name="zh" maxlength="80" placeholder="例：散步" value="${v('zh')}"></label>
+      <label><span>品詞（可不選）</span><select name="pos">${Object.keys(MY_POS).map(k => `<option value="${k}"${(it.pos||'')===k?' selected':''}>${MY_POS[k]}</option>`).join('')}</select></label>
+      <label class="myf-wide"><span>備註（可空白）</span><input name="note" maxlength="120" placeholder="例：在哪裡看到、用法" value="${v('note')}"></label>
+    </div>
+    <div class="myf-err" hidden></div>
+    <div class="myf-btns"><button type="submit" class="btn sm">儲存</button><button type="button" class="btn sm ghost" data-act="mytts">🔊 試聽</button><button type="button" class="btn sm ghost" data-act="mycancel">取消</button>${id ? `<button type="button" class="btn sm mydel" data-act="mydel" data-id="${id}">🗑 刪除</button>` : ''}</div>
+    <div class="small mute">動詞請填辭書形（例：かく、たべる、べんきょうする），選了動詞類別就會有動詞變化練習。</div>
+  </form>`;
+}
+function myFormVals(f){ const g = n => (f.elements[n] && f.elements[n].value || '').trim(); return {ja:g('ja'), kana:g('kana'), zh:g('zh'), note:g('note'), pos:g('pos')}; }
+function myCheck(v, id){
+  if(!v.kana) return '請填假名。';
+  if(!MineCore.isKana(v.kana)) return '假名欄只能填平假名或片假名。';
+  if(v.ja && /[一-龯々〆ヵヶ]/.test(v.ja) && MineCore.furiOf(v.ja, v.kana) == null) return '日文和假名對不起來，請再檢查一次（例：散歩／さんぽ）。';
+  if(MY_G[v.pos] && !MineCore.conjugate(v.ja, v.kana, MY_G[v.pos])) return '這個動詞類別和字尾對不起來；動詞請填辭書形（I 類：～う段，II 類：～る，III 類：～する／くる）。';
+  const dup = Object.keys(MY.items).find(k => k !== id && MY.items[k].kana === v.kana && (MY.items[k].ja||'') === v.ja);
+  if(dup) return '「我的單語」裡已經有這個字了。';
+  return '';
+}
+function mySubmit(f){
+  const id0 = f.dataset.id || '', v = myFormVals(f), err = myCheck(v, id0);
+  const eb = f.querySelector('.myf-err'); if(err){ eb.textContent = err; eb.hidden = false; return; }
+  const now = Date.now(), id = id0 || MineCore.newId(), old = MY.items[id] || {};
+  const it = {ja: v.ja, kana: v.kana, zh: v.zh, t: old.t || now, u: now};
+  if(v.note) it.note = v.note; if(v.pos) it.pos = v.pos;
+  MY.items[id] = it; delete MY.tomb[id];
+  myFormFor = null; mySave(); myRegister();
+  toast(id0 ? '已更新' : '已加入「我的單語」'); myRerender();
+}
+function myDelete(id){
+  if(!MY.items[id]) return;
+  delete MY.items[id]; MY.tomb[id] = Date.now();
+  const pre = ['my_'+id+':', 'mye_'+id+':', 'myf_'+id+':'];
+  ['unf', 'review'].forEach(kind => Object.keys(S[kind]||{}).forEach(k => { if(pre.some(p => k.startsWith(p))){ if(window.SyncMerge) SyncMerge.tomb(S, kind, k); delete S[kind][k]; } }));
+  save(); myFormFor = null; mySave(); myRegister(); toast('已刪除'); myRerender();
+}
+function myRerender(){ if(current && current.type==='mine'){ const y = scrollY; keepReveal = true; try{ viewMine(); } finally { keepReveal = false; } window.scrollTo(0, y); } }
+function myExport(){
+  const data = {app:'nh-study', kind:'mine', v:1, exportedAt:new Date().toISOString(), items: myList()};
+  const txt = JSON.stringify(data, null, 1);
+  try{ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'application/json'}));
+    a.download = 'nh-study-mine-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }catch(e){}
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => toast(`已匯出 ${data.items.length} 個字（已下載 JSON，也複製到剪貼簿）`), () => toast(`已匯出 ${data.items.length} 個字（已下載 JSON）`));
+  else toast(`已匯出 ${data.items.length} 個字（已下載 JSON）`);
+}
+function viewMine(){
+  renderSide('mine'); current = {type:'mine'}; if(!keepReveal) reveal = {};
+  const L = myList(); L.forEach((it, n) => { const d = DLG['my_'+it.id]; if(d) d.myN = n+1; });
+  const pend = L.filter(it => DLG['my_'+it.id] && (DLG['my_'+it.id].tts || !DLG['mye_'+it.id])).length;
+  const signed = window.NhSync && NhSync.configReady && NhSync.configReady();
+  $('#view').innerHTML = `
+  <div class="lhead-block">
+  <div class="crumb"><a href="#/">首頁</a> › 我的單語</div>
+  <h1>⭐ 我的單語</h1>
+  <div class="lhead-sub"><span class="kana">わたしのたんご</span><span class="lhead-zh">自己加的字・和課本單語分開放</span></div>
+  <div class="player lhead-bar">
+    ${L.length ? `<button class="btn sm" id="playAllBtn">▶ 全部播放</button>` : ''}${speedSegHTML()}
+    <button type="button" class="btn sm alt" data-act="myadd">＋ 新增單語</button>
+    ${L.length ? `<button type="button" class="btn sm ghost" data-act="myexport" title="下載成 JSON 檔（也會複製到剪貼簿）">⤓ 匯出</button>` : ''}
+  </div></div>
+  ${myFormFor === '' ? `<div class="card myformcard">${myFormHTML(null)}</div>` : ''}
+  ${L.length ? `<p class="small mute mylead">先聽，再點灰條：第 1 次顯示日文＋假名、第 2 次加中文。${pend ? `有 ${pend} 個字還沒配自然語音和例句（先用裝置內建語音）。` : ''}</p>
+  <div class="tlist timg-sm mylist" data-blk><div class="blkbar">${blkBtn(false)}</div>${L.map(myCardHTML).join('')}</div>`
+  : (myFormFor === '' ? '' : `<div class="card myempty"><div class="myempty-ic">⭐</div><div><b>還沒有自己的單語</b><div class="small mute">課本以外看到、聽到的新字，按「＋ 新增單語」輸入日文、假名、中文，就能在這裡先聽再看。</div></div></div>`)}
+  <p class="small mute myprivacy">🔒 這些字存在這台裝置；${signed ? '登入同步後也會存到你自己的帳號，其他同學看不到。' : '其他同學看不到。'}</p>`;
+  const pb = $('#playAllBtn');
+  if(pb) pb.onclick = () => { if(curPlaying){ stopAll(); setPlaying(null); return; } playSeqMix(myList().map(it => ({d: DLG['my_'+it.id], i: 0})).filter(x => x.d), 900); };
+  const f = document.querySelector('form.myform'); if(f && !keepReveal){ const inp = f.querySelector(f.dataset.id ? 'input[name="zh"]' : 'input[name="ja"]'); if(inp) setTimeout(() => inp.focus({preventScroll:true}), 30); }
+}
+document.addEventListener('submit', e => { const f = e.target.closest && e.target.closest('form.myform'); if(!f) return; e.preventDefault(); mySubmit(f); });
+function myAct(act, b){
+  if(act==='myadd'){ myFormFor = ''; myRerender(); const f = document.querySelector('form.myform'); if(f){ f.scrollIntoView({block:'nearest'}); const i = f.querySelector('input[name="ja"]'); if(i) i.focus({preventScroll:true}); } }
+  else if(act==='myedit'){ myFormFor = (myFormFor === b.dataset.id) ? null : b.dataset.id; myRerender(); }
+  else if(act==='mycancel'){ myFormFor = null; myRerender(); }
+  else if(act==='mydel'){ if(b.dataset.armed){ myDelete(b.dataset.id); } else { b.dataset.armed = '1'; b.textContent = '確定刪除？再按一次'; b.classList.add('armed'); setTimeout(() => { if(b.isConnected){ delete b.dataset.armed; b.textContent = '🗑 刪除'; b.classList.remove('armed'); } }, 4000); } }
+  else if(act==='mytts'){ const f = b.closest('form.myform'); const v = f && myFormVals(f); if(v && (v.kana||v.ja)){ stopAll(); speakTTS(v.kana || v.ja, playToken); } else toast('先填假名'); }
+  else if(act==='myexport') myExport();
+}
 /* 綜合聽力測驗（v3.26）：句庫 BOOK.mix（mix.js）→ 虛擬對話 mx，音檔 audio/mx_<i>.mp3，複習 key mx:<i>（append-only，走既有同步） */
 const MIX = B.mix || [];
 const MIX_LV = {e:'簡單', m:'中等', h:'難'};
@@ -247,12 +411,12 @@ function stopAll(){
 function setPlaying(key){
   curPlaying = key;
   document.querySelectorAll('.line.playing,.dline.playing,.vfrow.playing').forEach(e=>e.classList.remove('playing'));
-  if(key && key.startsWith('vf')){ const r = document.querySelector(`.vfrow[data-key="${key}"]`); if(r){ r.classList.add('playing'); const dt = r.closest('details'); if(dt && !dt.open) dt.open = true; const t = r.getBoundingClientRect().top; if(t > innerHeight-80 || t < 90) r.scrollIntoView({block:'center', behavior:'smooth'}); } }
+  if(key){ const r = document.querySelector(`.vfrow[data-key="${key}"]`); if(r){ r.classList.add('playing'); const dt = r.closest('details'); if(dt && !dt.open) dt.open = true; const t = r.getBoundingClientRect().top; if(t > innerHeight-80 || t < 90) r.scrollIntoView({block:'center', behavior:'smooth'}); } }
   document.querySelectorAll('[data-act="dall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.d+':') ? '⏹ 停止' : '▶ 全部播放');
   if(key){ const el = document.querySelector(`.line[data-key="${key}"]`) || document.querySelector(`.dline[data-key="${key}"]`); const dt = el && el.closest('details'); if(dt && !dt.open) dt.open = true; const card = el && el.closest('.tcard'); if(card){ syncTexChev(card); syncTexAllBtn(); } if(el){ el.classList.add('playing'); if(el.getBoundingClientRect().top > innerHeight-120 || el.getBoundingClientRect().top < 100) el.scrollIntoView({block:'center', behavior:'smooth'}); } }
   const pb = $('#playAllBtn'); if(pb) pb.textContent = key ? '⏹ 停止' : '▶ 全部播放';
-  document.querySelectorAll('[data-act="vfall"]').forEach(b => b.textContent = key && key.startsWith('vf'+b.dataset.j+':') ? '⏹ 停止' : '▶ 依序播放');
-  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.vf ? '動詞變化' : d.mix ? '綜合聽力測驗' : d.tangoEx ? `第${d.l}課 單語例句` : d.tango ? `第${d.l}課 單語 p.${d.lines[+i]&&d.lines[+i].pg||''}` : d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
+  document.querySelectorAll('[data-act="vfall"]').forEach(b => b.textContent = key && key.startsWith(b.dataset.j+':') ? '⏹ 停止' : '▶ 依序播放');
+  const np = $('#nowPlaying'); if(np){ const [id,i] = (key||'').split(':'); const d = DLG[id]; np.textContent = d ? `▶ ${d.mine ? '我的單語' : d.vf ? '動詞變化' : d.mix ? '綜合聽力測驗' : d.tangoEx ? `第${d.l}課 單語例句` : d.tango ? `第${d.l}課 單語 p.${d.lines[+i]&&d.lines[+i].pg||''}` : d.drill ? (d.l ? `第${d.l}課・文型${d.drill.split('-')[1]} p.${B.grammar[d.drill].pg}` : `入門・${B.grammar[d.drill].p} p.${B.grammar[d.drill].pg}`) : d.situ ? `場合使用（課外）第${d.l}課 ${d.src.label}` : d.src ? `第${d.l}課 ${d.src.label} p.${d.src.page}` : `實用會話 ${d.id}`}・${lineNo(d,+i).lab}` : ''; } // no Japanese text here: listening first
 }
 function speakTTS(text, token){
   return new Promise(res => {
@@ -280,7 +444,7 @@ async function playLine(d, i, token){
   if(token === undefined){ stopAll(); token = playToken; }
   const key = d.id + ':' + i; setPlaying(key);
   const ln = d.lines[i];
-  if(S.engine === 'mp3'){
+  if(S.engine === 'mp3' && !d.tts){
     try{ await playMP3(`audio/${d.id}_${i}${S.speed<1?'_s':''}.mp3`, token); }
     catch(e){ if(token !== playToken) return false; toast('MP3 載入失敗，改用裝置語音'); await speakTTS(ln.say||ln.ja, token); }
   } else { await speakTTS(ln.say||ln.ja, token); }
@@ -388,6 +552,7 @@ function tangoExSrcHTML(d, i){
   return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/t/${d.l}">🎧 第${d.l}課全部單語 ›</a></div></div>`;
 }
 function srcHTML(d, i){
+  if(d.mine) return mySrcHTML(d, i);
   if(d.mix) return mixSrcHTML(d, i);
   if(d.tangoEx) return tangoExSrcHTML(d, i);
   if(d.tango) return tangoSrcHTML(d, i);
@@ -461,7 +626,7 @@ function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Mat
 
 /* ---------------- side nav ---------------- */
 function renderSide(cur){
-  $('#side').innerHTML = searchFormHTML('', 'sside') + `<a href="#/" class="${cur==='home'?'cur':''}">🏠 首頁</a><a href="#/review" class="${cur==='review'?'cur':''}">📝 複習清單（${revCount()}）</a>${MIX.length?`<a href="#/mix" class="${cur==='mix'?'cur':''}">🎧 綜合聽力測驗</a>`:''}<a href="#/p/b/0" class="${cur==='book'?'cur':''}">📚 整本課本（全部頁面）</a>` +
+  $('#side').innerHTML = searchFormHTML('', 'sside') + `<a href="#/" class="${cur==='home'?'cur':''}">🏠 首頁</a><a href="#/review" class="${cur==='review'?'cur':''}">📝 複習清單（${revCount()}）</a><a href="#/mine" class="${cur==='mine'?'cur':''}">⭐ 我的單語（${myList().length}）</a>${MIX.length?`<a href="#/mix" class="${cur==='mix'?'cur':''}">🎧 綜合聽力測驗</a>`:''}<a href="#/p/b/0" class="${cur==='book'?'cur':''}">📚 整本課本（全部頁面）</a>` +
     B.lessons.map(l => { const p = lessonProgress(l.n); return `<a href="#/l/${l.n}" class="${cur===l.n?'cur':''}">${l.n?`第${l.n}課 `:''}${esc(l.t)}<small>${esc(l.zh)}・${p.done}/${p.total} 完成</small></a>`; }).join('');
 }
 
@@ -478,6 +643,7 @@ function viewHome(){
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${revCount()}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
+  <a class="card mxhome myhome" href="#/mine"><div class="mxhome-ic">⭐</div><div><div class="ltitle">我的單語</div><div class="small mute">${myList().length ? `已有 ${myList().length} 個自己加的字・` : ''}自己輸入課本以外的新字（日文、假名、中文），先聽再看；只存在你的裝置與你的同步帳號。</div></div></a>
   ${MIX.length?`<a class="card mxhome" href="#/mix"><div class="mxhome-ic">🎧</div><div><div class="ltitle">綜合聽力測驗</div><div class="small mute">自己選課（單選、複選、連選），用這幾課的單語、本文、文型組成新句子，先聽再看；下拉看用到的單語、文型與動詞・形容詞變化。</div></div><span class="mxhome-go">›</span></a>`:''}
   <div class="small" style="margin:-6px 0 12px"><a href="#/p/b/0" style="color:inherit">📚 翻閱整本課本（全部 272 頁・含第13–18課與附錄）›</a></div>
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
@@ -665,9 +831,7 @@ function texRevCount(n, wordNo){
 function texRevBadgeHTML(c){ return `<span class="texrevb"${c?'':' hidden'} title="底下例句有 ${c} 句待複習">待複習 ${c}</span>`; }
 function syncTexRev(card){
   if(!card) return;
-  const row = card.querySelector('.twd'); const m = row && (row.dataset.key||'').match(/^t(\d+):(\d+)$/); if(!m) return;
-  const ln = (DLG['t'+m[1]]||{lines:[]}).lines[+m[2]]; if(!ln) return;
-  const c = texRevCount(m[1], ln.no);
+  const c = card.querySelectorAll('details.tex .exrow.unf').length;   // 例句列一直在 DOM 裡（收合也在）
   card.classList.toggle('has-exrev', c > 0);
   const b = card.querySelector('.texrevb'); if(b){ b.hidden = !c; b.textContent = '待複習 '+c; b.title = `底下例句有 ${c} 句待複習`; }
   const ch = card.querySelector('.texchev'); if(ch) ch.classList.toggle('rev', c > 0);
@@ -976,7 +1140,7 @@ function drillNo(ln){
   if(t[0]==='※') return {pre:'', lab:'※參考'+(t.slice(1).trim()?' '+t.slice(1).trim():'')};
   return null;
 }
-function lineNo(d, i){ const ln = d.lines[i]; if(d.tangoEx) return {pre:'例句', lab: (ln.w&&ln.ex) ? `${ln.w}-${ln.ex}` : `第${i+1}句`}; if(d.tango) return {pre: ln.kind==='expr' ? 'いろいろな表現' : '單語', lab: ln.lab || String(ln.no||i+1)}; if(ln.lab) return {pre:'', lab:ln.lab}; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
+function lineNo(d, i){ const ln = d.lines[i]; if(d.mine) return d.myEx ? {pre:'例句', lab:`第${i+1}句`} : d.myForms ? {pre:'動詞變化', lab: ln.lab||''} : {pre:'我的單語', lab: ln.kana||''}; if(d.tangoEx) return {pre:'例句', lab: (ln.w&&ln.ex) ? `${ln.w}-${ln.ex}` : `第${i+1}句`}; if(d.tango) return {pre: ln.kind==='expr' ? 'いろいろな表現' : '單語', lab: ln.lab || String(ln.no||i+1)}; if(ln.lab) return {pre:'', lab:ln.lab}; if(d.drill){ const r = drillNo(ln); if(r) return r; return {pre:ln.tag||'', lab:`第${i+1}句`}; }
   if(ln.scene) return {pre:'', lab:'課本場景標示'};   // 本文：場景卡片不算句數；其餘一張＝課本一個說話輪次／段落
   return {pre:'', lab:`第${d.lines.slice(0, i+1).filter(l => !l.scene).length}句`}; }
 let PM = null;   // 目前開著的課本頁視窗：{el, mode:'side'|'modal', id, ps, i, zoom, go, zoomTo}
@@ -1070,7 +1234,7 @@ function lineHTML(d, i, opts={}){
   const lv = (reveal[key]||0);
   const inRev = !!S.review[key];
   return `<div class="line${S.unf[key]?' unf':''}" data-key="${key}">
-    <div class="lhead">${ufHTML(key, ln.scene)}<span class="spk ${ln.cls||ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg}${lineNo(d,i).pre?' '+esc(lineNo(d,i).pre):''}・`:''}${opts.showId?`${d.mix?'🎧 綜合聽力':d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.situ?`場合使用（課外）第${d.l}課${d.src.label}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}${esc(lineNo(d,i).lab)}</span>
+    <div class="lhead">${ufHTML(key, ln.scene)}<span class="spk ${ln.cls||ln.s}">${esc(sp.name)}</span><span class="small mute">${d.drill&&!opts.showId?`p.${ln.pg}${lineNo(d,i).pre?' '+esc(lineNo(d,i).pre):''}・`:''}${opts.showId?`${d.mine?'⭐ 我的單語':d.mix?'🎧 綜合聽力':d.drill?`${d.l?'文型'+d.drill:'入門'} p.${ln.pg}`:d.situ?`場合使用（課外）第${d.l}課${d.src.label}`:d.src?`第${d.l}課${d.src.label} p.${d.src.page}`:d.id}・`:''}${esc(lineNo(d,i).lab)}</span>
       <div class="lbtns"><button class="ibtn" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放這句">🔊</button><button class="ibtn" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次">🔁</button></div></div>
     ${S.listenFirst&&lv>=1?`<div class="lrv" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv===1?'顯示中文':'隱藏'}">`:''}${lv>=1?`<div class="ja">${ln.furi?furiHTML(ln.furi):esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}`:`<button class="hiddenText" data-act="rv" data-k="${key}">👂 先聽聽看… 點這裡顯示日文</button>`}
     ${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}${S.listenFirst&&lv>=1?'</div>':''}
@@ -1098,7 +1262,7 @@ function blockShow(b){
   const box = b.closest('[data-blk]'); if(!box) return; const on = !b.classList.contains('on');
   if(box.tagName==='DETAILS' && on) box.open = true;
   box.querySelectorAll('details.tex').forEach(dt => { dt.open = on; const c = dt.closest('.tcard'); if(c) syncTexChev(c); });
-  [...new Set([...box.querySelectorAll('details.vfd')].map(dt => +dt.dataset.j))].forEach(j => vfSetAll(j, on));
+  [...new Set([...box.querySelectorAll('details.vfd')].map(dt => dt.dataset.j))].forEach(j => vfSetAll(j, on));
   syncTexAllBtn();
   const mine = el => el.parentElement.closest('[data-blk]') === box;
   [...box.querySelectorAll('.line[data-key]')].filter(mine).forEach(el => { const k = el.dataset.key, [id, i] = k.split(':');
@@ -1193,7 +1357,7 @@ function rerenderLine(d, i, opts){
   const box = sb ? sb.innerHTML : '';
   const hiddenAgain = S.listenFirst && !(reveal[key]||0);
   if(el.classList.contains('srow')){   // 本文／文型／實用會話: panel is a sibling of the row, keep it
-    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : el.classList.contains('exrow') ? tangoExRowHTML(d, i) : el.classList.contains('trow') ? tangoRowHTML(d, i) : rowHTML(d, i);
+    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : el.classList.contains('exrow') ? tangoExRowHTML(d, i) : el.classList.contains('myrow') ? myRowHTML(d, i) : el.classList.contains('trow') ? tangoRowHTML(d, i) : rowHTML(d, i);
     el.replaceWith(tmp.querySelector('.srow'));
     if(box && hiddenAgain){ closeSrc(key); return; }
     if(box) setIdk(document.querySelector(`.line[data-key="${key}"]`), true);
@@ -1702,10 +1866,11 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if(!b) return;
   const act = b.dataset.act;
   if(/^mx/.test(act) && act!=='mx'){ mixAct(act, b, e); return; }
+  if(/^my(add|edit|cancel|del|tts|export)$/.test(act)){ e.preventDefault(); myAct(act, b); return; }
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
-  else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(+k.slice(2).split(':')[0]); }
-  else if(act==='vfshow'){ const j = +b.dataset.j; vfSetAll(j, !DLG['vf'+j].lines.every((_, k) => vfReveal['vf'+j+':'+k])); }
-  else if(act==='vfall'){ const j = +b.dataset.j, d = DLG['vf'+j]; if(curPlaying && curPlaying.startsWith('vf'+j+':')){ stopAll(); setPlaying(null); } else playSeq(d, d.lines.map((_, k) => k), 600); }
+  else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(k.split(':')[0]); }
+  else if(act==='vfshow'){ const j = b.dataset.j; vfSetAll(j, !DLG[j].lines.every((_, k) => vfReveal[j+':'+k])); }
+  else if(act==='vfall'){ const j = b.dataset.j, d = DLG[j]; if(curPlaying && curPlaying.startsWith(j+':')){ stopAll(); setPlaying(null); } else playSeq(d, d.lines.map((_, k) => k), 600); }
   else if(act==='rep'){ playSeq(DLG[b.dataset.d], [+b.dataset.i], 900, 3); toast('重複 3 次'); }
   else if(act==='rv'){ const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
   else if(act==='idk'){
@@ -1760,6 +1925,7 @@ async function audioList(){
   Object.entries(B.tangoEx || {}).forEach(([n, items]) => (items||[]).forEach((_, i) => add(`audio/t${n}e_${i}`)));
   (B.mix || []).forEach((_, i) => add(`audio/mx_${i}`));
   (B.vf || []).forEach((v, j) => v.f.forEach((_, k) => add(`audio/vf${j}_${k}`)));
+  myAudioIds().forEach(add);   // 我的單語：已配好的自然語音（mine.js）
   Object.entries(window.RP || {}).forEach(([did, m]) => Object.entries(m).forEach(([i, v]) => v[1].forEach((_, a) => add(`audio/${did}-r_${i}_${a}`))));
   return [...new Set(L)];
 }
@@ -1829,7 +1995,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.38（單語「例句」按鈕移到單語文字右邊）</div>
+  <div class="foot">版本 3.39（新增「我的單語」：自己輸入新字，先聽再看，會同步到自己的帳號）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -1963,6 +2129,7 @@ function renderRoute(){
   else if(a==='g') viewDrill(b);
   else if(a==='review') viewReview();
   else if(a==='mix') (b ? viewMixRun(b) : viewMixPick());
+  else if(a==='mine') viewMine();
   else if(a==='p') viewPage(b==='b' ? 'b' : +b, +(h.split('/')[2]||0));
   else if(a==='s'){ let q = ''; try{ q = decodeURIComponent(h.slice(2)); }catch(e){ q = h.slice(2); } viewSearch(q); }
   else viewHome();

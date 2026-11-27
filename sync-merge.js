@@ -10,6 +10,9 @@
      doneAt: { [id]: ts }
      quizAt: { [id]: ts }
    雲端 users/{uid} 形狀：各 map 的值帶 updatedAt，刪除則 { deleted:true, updatedAt }。
+   我的單語（v3.39）另存在 localStorage nhStudy.mine：{ items:{ [id]:{ja,kana,zh,note,pos,t,u} }, tomb:{ [id]: ts } }
+     雲端欄位 mine：{ [id]: {ja,kana,zh,note,pos,t,updatedAt} | {deleted:true, updatedAt} }，以 id 合併、較新者勝、刪除用 tombstone。
+     merge() 只有在任一邊有 mine 時才輸出 mine 欄位（舊資料形狀不變）。
 */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -136,13 +139,51 @@
   function merge(localPacked, cloud) {
     const l = localPacked || emptyPacked();
     const c = cloud || emptyPacked();
-    return {
+    const out = {
       review: mergeMaps(l.review, c.review, 'review'),
       unf: mergeMaps(l.unf, c.unf, 'unf'),
       done: mergeMaps(l.done, c.done, 'done'),
       quiz: mergeMaps(l.quiz, c.quiz, 'quiz'),
       updatedAt: Math.max(l.updatedAt || 0, c.updatedAt || 0)
     };
+    if (l.mine || c.mine) out.mine = mergeMine(l.mine, c.mine);
+    return out;
+  }
+
+  /* ---- 我的單語 ---- */
+  const MINE_FIELDS = ['ja', 'kana', 'zh', 'note', 'pos', 't'];
+  function mergeMine(a, b) { return mergeMaps(a || {}, b || {}, 'mine'); }
+  function packMine(store, now) {
+    now = now || Date.now();
+    const out = {};
+    const items = (store && store.items) || {}, tombs = (store && store.tomb) || {};
+    Object.keys(items).forEach(id => {
+      const v = items[id]; if (!v) return;
+      const e = {}; MINE_FIELDS.forEach(f => { if (v[f] != null) e[f] = v[f]; });
+      e.updatedAt = +v.u || +v.t || now;
+      out[id] = e;
+    });
+    Object.keys(tombs).forEach(id => {
+      if (out[id] && out[id].updatedAt >= (+tombs[id] || 0)) return;
+      out[id] = { deleted: true, updatedAt: +tombs[id] || now };
+    });
+    return out;
+  }
+  function applyMine(store, packed) {
+    const items = {}, tomb = {};
+    Object.keys(packed || {}).forEach(id => {
+      const v = packed[id]; if (!v) return;
+      if (v.deleted) { tomb[id] = v.updatedAt || 0; return; }
+      const e = {}; MINE_FIELDS.forEach(f => { if (v[f] != null) e[f] = v[f]; });
+      e.u = v.updatedAt || 0;
+      items[id] = e;
+    });
+    store.items = items; store.tomb = tomb;
+    return store;
+  }
+  function mineSig(store) {
+    const it = (store && store.items) || {};
+    return Object.keys(it).sort().map(id => id + '@' + (it[id].u || 0)).join('|');
   }
 
   function applyToLocal(S, packed) {
@@ -204,5 +245,5 @@
     return merge(packLocal(S, now), merged);
   }
 
-  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer, visibleSig, rebase };
+  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer, visibleSig, rebase, packMine, applyMine, mergeMine, mineSig };
 });
