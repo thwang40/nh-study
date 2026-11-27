@@ -994,3 +994,17 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .bmrev .ja{font-size:15px}.bmrev .kana{font-size:12px;color:var(--mute)}.bmrev .zh{font-size:13px}
 .bmhome{margin:0 0 12px;border-color:#eadcb4;background:#fffcf4}
 .bmcard{margin-top:3px;color:#7a5a12}
+/* 版本號＋有新版本提示（v3.43） */
+.hver{display:inline-block;margin-left:6px;font-size:11px;font-weight:600;letter-spacing:0;color:#fff;opacity:.6;vertical-align:middle;font-variant-numeric:tabular-nums}
+.updbar{position:sticky;top:var(--hdr,56px);z-index:19;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:6px 12px;background:#fff7e3;border-bottom:1px solid #e6c77a;color:#5a430c;font-size:14px}
+.updbar.hidden{display:none}
+.updbar .updgo{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;padding:4px 0;color:inherit;font:inherit;font-weight:700;cursor:pointer}
+.updbar .updbtn{background:var(--pri);color:#fff;border:0;border-radius:16px;padding:5px 14px;font:inherit;font-weight:700;cursor:pointer}
+.updbar .updlater{background:transparent;color:#7a5a12;border:1px solid #e6c77a;border-radius:16px;padding:4px 10px;font:inherit;cursor:pointer}
+.bmhome{margin:0 0 12px;border:1px solid #e6c77a;background:#fff7e3;box-shadow:0 1px 4px #0001}
+.bmhome-lab{color:#7a5a12}
+.bmhome-link{display:block;margin-top:4px;color:var(--pri);text-decoration:underline;text-underline-offset:3px;font-size:16px;line-height:1.45;overflow-wrap:anywhere}
+.bmhome-link b{font-weight:800}
+.bmhome-kana{font-size:13px;color:var(--mute)}
+.bmhome-loc{font-weight:700}
+.bmhome-hint{margin:0 0 8px}

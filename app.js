@@ -2,6 +2,7 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
+const APP_VER = '3.43';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
@@ -270,9 +271,11 @@ function bmLessonLine(n){
   return `<div class="small bmcard">🏷 ${ks.length} 個註記・最新 ${esc(bmLabel(lt))}・${esc(bmTime(BM.items[lt].t))}</div>`;
 }
 function bmHomeHTML(){
-  const k = bmLatestAll(); if(!k) return '';
-  const x = bmLine(k), n = x.d.l, L = LESSON[n];
-  return `<div class="card bmhome"><div class="small">🏷 最新的時間註記：<b>${lessonLabel(n)}</b> ${esc(L.t)}<span class="mute">（${esc(L.r||'')}）</span>・${esc(bmLabel(k))}・${esc(bmTime(BM.items[k].t))}・本課共 ${bmList(n).length} 個</div>
+  const k = bmLatestAll(); if(!k) return `<div class="small mute bmhome-hint">🏷 在句子上按 🏷 可以記下練習到哪裡，最新的一個會顯示在這裡。</div>`;
+  const x = bmLine(k), n = x.d.l, L = LESSON[n], tm = bmTime(BM.items[k].t);
+  return `<div class="card bmhome" role="region" aria-label="最新的時間註記">
+    <div class="bmhome-lab small">🏷 最新的時間註記在這裡（${esc(tm)}・本課共 ${bmList(n).length} 個）</div>
+    <a class="bmhome-link" href="${bmHref(x.d)}" data-act="bmgo" data-k="${esc(k)}"><b>${lessonLabel(n)} ${esc(L.t)}</b><span class="bmhome-kana">（${esc(L.r||'')}）</span><span class="bmhome-loc">・${esc(bmLabel(k))}・${esc(tm)} ›</span></a>
     <div class="row" style="margin-top:6px"><button type="button" class="btn sm" data-act="bmgo" data-k="${esc(k)}">從最新的繼續</button><a class="btn sm ghost" style="text-decoration:none" href="#/l/${n}">看本課全部註記</a></div></div>`;
 }
 function bmRefreshBars(){ document.querySelectorAll('[data-bm-bar]').forEach(el => { const t = document.createElement('div'); t.innerHTML = bmBarHTML(+el.dataset.bmBar, !!el.dataset.bmCompact); const nn = t.firstElementChild; if(nn){ const det = el.querySelector('details.bmdet'); const nd = nn.querySelector('details.bmdet'); if(det && nd) nd.open = det.open; el.replaceWith(nn); } }); }
@@ -759,6 +762,7 @@ function viewHome(){
   renderSide('home');
   const totalD = B.dialogues.length, doneD = B.dialogues.filter(d=>S.done[d.id]).length;
   $('#view').innerHTML = `
+  ${bmHomeHTML()}
   <div class="hero"><h1>撿角日語</h1><div class="sub">文化日本語 第1～18課 聽力練習</div></div>
   <p class="mute small">教材：《${esc(B.title)}》（文化外國語專門學校 編）。每課依課本頁序收錄「本文」原文與「文型」例句（皆標頁碼），最後是 2 段實用小對話，先「只聽不看」，再點開日文、中文。聽不懂就按「我不會」，會告訴你出自第幾課、哪個文型、課本第幾頁。每課也可以翻閱課本頁面複習。</p>
   ${searchFormHTML('', 'home')}
@@ -767,7 +771,6 @@ function viewHome(){
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${revCount()}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
-  ${bmHomeHTML()}
   <a class="card mxhome myhome" href="#/mine"><div class="mxhome-ic">⭐</div><div><div class="ltitle">我的單語</div><div class="small mute">${myList().length ? `已有 ${myList().length} 個自己加的字・` : ''}自己輸入課本以外的新字（日文、假名、中文），先聽再看；只存在你的裝置與你的同步帳號。</div></div></a>
   ${MIX.length?`<a class="card mxhome" href="#/mix"><div class="mxhome-ic">🎧</div><div><div class="ltitle">綜合聽力測驗</div><div class="small mute">自己選課（單選、複選、連選），用這幾課的單語、本文、文型組成新句子，先聽再看；下拉看用到的單語、文型與動詞・形容詞變化。</div></div><span class="mxhome-go">›</span></a>`:''}
   <div class="small" style="margin:-6px 0 12px"><a href="#/p/b/0" style="color:inherit">📚 翻閱整本課本（全部 272 頁・含第13–18課與附錄）›</a></div>
@@ -2125,7 +2128,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.42（新增 🏷 時間註記：句子按 🏷 記下日期時間，一課可記多個，課頁列出全部並可「從最新的繼續」，會同步到自己的帳號）</div>
+  <div class="foot">版本 ${APP_VER}（頁面最上方顯示版本號；有新版本時上方會出現「有新版本，按此更新」）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -2327,14 +2330,64 @@ setTimeout(countView, 1500); // after first render; never blocks the app
 // 頂端列高度（含 iPhone 瀏海）→ CSS --hdr，讓播放列／側欄剛好貼在頂端列下面
 (function(){ const t = document.querySelector('.top'); if(!t) return; const set = () => document.documentElement.style.setProperty('--hdr', t.offsetHeight + 'px');
   set(); window.addEventListener('resize', set); window.addEventListener('load', set); if(window.ResizeObserver) new ResizeObserver(set).observe(t); })();
+/* ---- 版本號與「有新版本」提示（v3.43） ----
+   頂端列顯示 vX.XX；新版 sw.js 裝好後在等待中 → 頂端列下方出現提示列「🆕 有新版本 vX.XX，按此更新」（不是全螢幕）。
+   按「更新」→ 叫等待中的 SW skipWaiting → controllerchange 後重新整理一次（sessionStorage 防重複重整）。
+   回到頁面／每 30 分鐘：reg.update()，並在連線時抓 version.json（no-store）比對；離線就不檢查、不報錯。 */
+function verNum(v){ return String(v||'').split('.').map(x => +x || 0); }
+function verNewer(a, b){ const x = verNum(a), y = verNum(b); for(let i = 0; i < Math.max(x.length, y.length); i++){ if((x[i]||0) !== (y[i]||0)) return (x[i]||0) > (y[i]||0); } return false; }
+(function(){ const h = document.getElementById('hver'); if(h) h.textContent = 'v' + APP_VER; })();
+(function(){ try{ const from = sessionStorage.getItem('nhUpdFrom'); if(from){ sessionStorage.removeItem('nhUpdFrom'); if(from !== APP_VER) setTimeout(() => toast('✅ 已更新到 v' + APP_VER), 600); } }catch(e){} })();
+const UPD = {reg: null, ver: '', dismissed: '', asked: false, silent: false};
+function updShow(ver){
+  const bar = document.getElementById('updBar'); if(!bar) return;
+  if(ver) UPD.ver = ver;
+  const key = UPD.ver || 'waiting'; if(UPD.dismissed === key) return;
+  bar.innerHTML = `<button type="button" class="updgo" data-upd="go">🆕 有新版本${UPD.ver ? ' v' + esc(UPD.ver) : ''}，按此更新</button><button type="button" class="updbtn" data-upd="go">更新</button><button type="button" class="updlater" data-upd="later">稍後</button>`;
+  bar.classList.remove('hidden'); document.documentElement.classList.add('has-upd');
+}
+function updHide(){ const bar = document.getElementById('updBar'); if(bar){ bar.classList.add('hidden'); bar.innerHTML = ''; } document.documentElement.classList.remove('has-upd'); }
+function updAskVer(w){ return new Promise(res => { try{ const ch = new MessageChannel(); const t = setTimeout(() => res(''), 1500); ch.port1.onmessage = e => { clearTimeout(t); res((e.data && e.data.v) || ''); }; w.postMessage({type:'ver'}, [ch.port2]); }catch(e){ res(''); } }); }
+async function updWaiting(reg){
+  if(!reg || !reg.waiting || !navigator.serviceWorker.controller) return;
+  const v = await updAskVer(reg.waiting);
+  // 頁面本身已經是新版（殼層是網路優先，一般重新整理就會拿到新檔）→ 讓等待中的同版 SW 安靜接手，不重整、不提示
+  if(v && !verNewer(v, APP_VER)){ if(v === APP_VER){ UPD.silent = true; reg.waiting.postMessage({type:'skipWaiting'}); } return; }
+  updShow(v);
+}
+function updReload(){
+  try{ const last = +sessionStorage.getItem('nhUpdAt') || 0; if(Date.now() - last < 10000) return; sessionStorage.setItem('nhUpdAt', String(Date.now())); sessionStorage.setItem('nhUpdFrom', APP_VER); }catch(e){}
+  location.reload();
+}
+async function updGo(){
+  const bar = document.getElementById('updBar'); if(bar) bar.innerHTML = '<span class="updgo">⏳ 更新中…</span>';
+  UPD.asked = true;
+  const reg = UPD.reg || (navigator.serviceWorker && await navigator.serviceWorker.getRegistration().catch(() => null));
+  if(reg && !reg.waiting){ try{ await reg.update(); }catch(e){} for(let i = 0; i < 30 && !reg.waiting && reg.installing; i++) await new Promise(r => setTimeout(r, 500)); }
+  if(reg && reg.waiting){ reg.waiting.postMessage({type:'skipWaiting'}); setTimeout(updReload, 4000); }   // controllerchange 沒來的保險
+  else updReload();
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-upd]'); if(!b) return; e.preventDefault();
+  if(b.dataset.upd === 'later'){ UPD.dismissed = UPD.ver || 'waiting'; updHide(); } else updGo(); });
+async function updCheckJson(){
+  if(!navigator.onLine) return;
+  try{ const r = await fetch('version.json?t=' + Date.now(), {cache:'no-store'}); if(!r.ok) return; const j = await r.json();
+    if(j && j.v && verNewer(j.v, APP_VER)){ UPD.ver = j.v; if(UPD.reg){ try{ await UPD.reg.update(); }catch(e){} } updShow(j.v); } }catch(e){}
+}
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
-  // 新版上線後盡快生效：sw.js 不走 HTTP 快取、回到頁面時檢查更新；新版接手後自動重新整理一次（第一次安裝不重整）
+  // sw.js 不走 HTTP 快取；回到頁面時檢查更新。新版 SW 接手後重新整理一次（第一次安裝不重整）。
   const hadCtl = !!navigator.serviceWorker.controller; let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if(!hadCtl || reloaded) return; reloaded = true; location.reload(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if(!hadCtl || reloaded) return; if(UPD.silent && !UPD.asked){ UPD.silent = false; updHide(); return; } reloaded = true; updReload(); });
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg => {
-    const chk = () => reg.update().catch(()=>{});
+    UPD.reg = reg;
+    updWaiting(reg);
+    reg.addEventListener('updatefound', () => { const w = reg.installing; if(!w) return;
+      w.addEventListener('statechange', () => { if(w.state === 'installed' && navigator.serviceWorker.controller) updWaiting(reg); }); });
+    const chk = () => { if(!navigator.onLine) return; reg.update().catch(()=>{}); updCheckJson(); };
     document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') chk(); });
+    window.addEventListener('online', chk);
     setInterval(chk, 30*60*1000);
+    setTimeout(updCheckJson, 4000);
   }).catch(()=>{}));
 }
 })();

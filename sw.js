@@ -1,4 +1,5 @@
-const SHELL = 'nh-shell-v91', AUDIO = 'nh-audio-v9', PAGES = 'nh-pages-v1';
+const APP_VER = '3.43';   // 要和 app.js APP_VER、version.json、index.html 一致（test_version.js 會檢查）
+const SHELL = 'nh-shell-v92', AUDIO = 'nh-audio-v9', PAGES = 'nh-pages-v1';
 const SHELL_FILES = ['./','index.html','style.css','app.js','data.js','tango.js','tango-ex.js','mix.js','vforms.js','mine-core.js','mine.js','ill.js','sec.js','blk.js','firebase-config.js','sync-merge.js','sync-auth.js','sync.js','auth-callback.html','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/maskable-512.png'].concat(["pages/ill2/1-T1_0.webp", "pages/ill2/1-T2_0.webp", "pages/ill2/1-T3_0.webp", "pages/ill2/1-T3_1.webp", "pages/ill2/10-T1_0.webp", "pages/ill2/10-T2_0.webp", "pages/ill2/11-T1_0.webp", "pages/ill2/11-T2_0.webp", "pages/ill2/11-T3_0.webp", "pages/ill2/12-T1_0.webp", "pages/ill2/12-T2_0.webp", "pages/ill2/12-T2_1.webp", "pages/ill2/12-T2_2.webp", "pages/ill2/12-T2_3.webp", "pages/ill2/12-T2_4.webp", "pages/ill2/2-T1_0.webp", "pages/ill2/2-T1_1.webp", "pages/ill2/2-T1_2.webp", "pages/ill2/2-T1_3.webp", "pages/ill2/2-T1_4.webp", "pages/ill2/2-T1_5.webp", "pages/ill2/2-T1_6.webp", "pages/ill2/2-T1_7.webp", "pages/ill2/2-T2_0.webp", "pages/ill2/3-T1_0.webp", "pages/ill2/3-T1_1.webp", "pages/ill2/4-T2_0.webp", "pages/ill2/4-T2_1.webp", "pages/ill2/5-T1_0.webp", "pages/ill2/5-T2_0.webp", "pages/ill2/5-T2_1.webp", "pages/ill2/5-T2_2.webp", "pages/ill2/6-T1_0.webp", "pages/ill2/6-T1_1.webp", "pages/ill2/6-T1_2.webp", "pages/ill2/6-T1_3.webp", "pages/ill2/6-T1_4.webp", "pages/ill2/6-T2_0.webp", "pages/ill2/6-T2_1.webp", "pages/ill2/6-T2_2.webp", "pages/ill2/6-T3_0.webp", "pages/ill2/6-T3_1.webp", "pages/ill2/6-T3_2.webp", "pages/ill2/6-T3_3.webp", "pages/ill2/6-T3_4.webp", "pages/ill2/6-T3_5.webp", "pages/ill2/7-T1_0.webp", "pages/ill2/7-T1_1.webp", "pages/ill2/7-T2_0.webp", "pages/ill2/7-T2_1.webp", "pages/ill2/7-T2_2.webp", "pages/ill2/7-T3_0.webp", "pages/ill2/7-T3_1.webp", "pages/ill2/8-T1_0.webp", "pages/ill2/8-T1_1.webp", "pages/ill2/8-T2_0.webp", "pages/ill2/9-T1_0.webp", "pages/ill2/9-T2_0.webp", "pages/ill2/9-T2_1.webp", "pages/ill2/9-T3_0.webp", "pages/ill2/9-T3_1.webp"]);
 self.window = self; importScripts('data.js'); importScripts('tango.js'); importScripts('tango-ex.js'); importScripts('mix.js'); importScripts('vforms.js'); importScripts('mine.js');
 const AUDIO_FILES = self.BOOK.dialogues.flatMap(d => d.lines.flatMap((_, i) => [`audio/${d.id}_${i}.mp3`, `audio/${d.id}_${i}_s.mp3`]));
@@ -22,7 +23,18 @@ async function cacheAudio(){
   }
 }
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const c = await caches.open(SHELL); await c.addAll(SHELL_FILES);
+    // v3.43 起：新版裝好後先「等待」，頁面上方顯示「有新版本」，使用者按「更新」才接手（不會在聽到一半時突然重新整理）。
+    // 第一次安裝，或是從 v91（3.42）以前的舊版升級（舊頁面沒有提示列）→ 照舊直接接手，舊頁面會自己重新整理一次。
+    const olds = (await caches.keys()).map(k => /^nh-shell-v(\d+)$/.exec(k)).filter(m => m && m[0] !== SHELL).map(m => +m[1]);
+    if (!olds.length || Math.max(...olds) < 92) await self.skipWaiting();
+  })());
+});
+self.addEventListener('message', e => {
+  const m = e.data || {};
+  if (m === 'skipWaiting' || m.type === 'skipWaiting') self.skipWaiting();
+  else if (m.type === 'ver' && e.ports && e.ports[0]) e.ports[0].postMessage({v: APP_VER, sw: SHELL});
 });
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
@@ -73,6 +85,7 @@ self.addEventListener('fetch', e => {
   // Intercepting these would break sign-in, especially iOS home-screen PWA redirects.
   if (/google(?:apis)?\.com$|gstatic\.com$|firebaseio\.com$|firebaseapp\.com$|googleapis\.com$/.test(url.hostname)) return;
   if (url.origin !== location.origin) return;
+  if (url.pathname.endsWith('/version.json')) return;   // 檢查新版本：一律走網路，不快取
   if (url.pathname.endsWith('.mp3')) {
     e.respondWith((async () => {
       const c = await caches.open(AUDIO);
