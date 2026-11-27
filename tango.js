@@ -545,7 +545,6 @@
     title: 'ドライブに行きませんか。',
     words: T18_WORDS,
     expr: T18_EXPR,
-    noImg: true,
     lines: packLines(T18_WORDS, 'word').concat(packLines(T18_EXPR, 'expr'))
   };
 })(typeof window !== 'undefined' ? window : globalThis);
