@@ -2,7 +2,7 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
-const APP_VER = '3.43';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
+const APP_VER = '3.44';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
@@ -290,7 +290,8 @@ function bmOpenAsk(d, i){
   anchor.after(el); bmAsk = key;
   const r = el.getBoundingClientRect(); if(r.bottom > innerHeight) el.scrollIntoView({block:'nearest', behavior:'smooth'});
 }
-function bmRedraw(key){ const x = bmLine(key); if(x) rerenderLine(x.d, x.i, current&&current.type==='review'?{review:true,showId:true}:{}); bmRefreshBars(); }
+function bmRedraw(key){ const x = bmLine(key); if(x) rerenderLine(x.d, x.i, current&&current.type==='review'?{review:true,showId:true}:{}); bmRefreshBars();
+  if(x && x.d.tangoEx){ const T = DLG['t'+x.d.l], wi = T ? T.lines.findIndex(l => l.no === x.ln.w) : -1; if(wi >= 0 && document.querySelector(`.line[data-key="${T.id}:${wi}"]`)){ const card = document.querySelector(`.line[data-key="${T.id}:${wi}"]`).closest('.tcard'); const op = card && card.querySelector('details.tex'); const wasOpen = op && op.open; rerenderLine(T, wi, {}); if(op && card.querySelector('details.tex')) card.querySelector('details.tex').open = wasOpen; if(card) syncTexChev(card); } } }
 function bmAct(act, b){
   if(act==='bm'){ const d = DLG[b.dataset.d], i = +b.dataset.i, key = d.id+':'+i;
     if(BM.items[key]){ if(bmAsk === key){ bmCloseAsk(); return; } bmOpenAsk(d, i); return; }
@@ -958,6 +959,13 @@ function texRevCount(n, wordNo){
   return c;
 }
 function texRevBadgeHTML(c){ return `<span class="texrevb"${c?'':' hidden'} title="底下例句有 ${c} 句待複習">待複習 ${c}</span>`; }
+// 收合時也看得到：這個字底下的例句有幾句加了 🏷；按一下直接跳到最新的那句（自動展開、字一樣先藏著）
+function texBmKeys(n, wordNo){ const ed = DLG['t'+n+'e']; if(!ed) return []; const ks = []; ed.lines.forEach((ln, i) => { const k = ed.id+':'+i; if(ln.w === wordNo && BM.items[k]) ks.push(k); }); return ks; }
+function texBmBadgeHTML(n, wordNo){
+  const ks = texBmKeys(n, wordNo); if(!ks.length) return '';
+  let lt = ks[0]; ks.forEach(k => { if((BM.items[k].t||0) > (BM.items[lt].t||0)) lt = k; });
+  return `<button type="button" class="texbmb" data-act="bmgo" data-k="${lt}" title="底下例句有 ${ks.length} 句時間註記，按一下跳到最新的">🏷 ${ks.length}</button>`;
+}
 function syncTexRev(card){
   if(!card) return;
   const c = card.querySelectorAll('details.tex .exrow.unf').length;   // 例句列一直在 DOM 裡（收合也在）
@@ -1010,7 +1018,7 @@ function tangoRowHTML(d, i){
   const hasEx = tangoHasEx(d, ln);
   const open = hasEx && texCardOpen(key);
   const revC = hasEx ? texRevCount(d.l, ln.no) : 0;
-  const chev = hasEx ? `<span class="texctl"><button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>${texRevBadgeHTML(revC)}</span>` : '';
+  const chev = hasEx ? `<span class="texctl"><button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>${texRevBadgeHTML(revC)}${texBmBadgeHTML(d.l, ln.no)}</span>` : '';
   const src = tangoImgSrc(d, i);
   const imgOpen = !!tangoImgOpen[key];
   const imgBtn = src ? `<button type="button" class="timg${imgOpen?' on':''}" data-act="tangoimg" data-k="${key}" aria-expanded="${imgOpen?'true':'false'}" aria-label="放大插圖" title="點一下放大"><img src="${src}" alt="" decoding="async" width="160" height="160" onerror="const b=this.closest('.timg'); if(b) b.hidden=true; const x=document.getElementById('timg-${key.replace(':','_')}'); if(x) x.remove();"></button>` : '';
@@ -2005,7 +2013,7 @@ document.addEventListener('click', e => {
   else if(act==='vfshow'){ const j = b.dataset.j; vfSetAll(j, !DLG[j].lines.every((_, k) => vfReveal[j+':'+k])); }
   else if(act==='vfall'){ const j = b.dataset.j, d = DLG[j]; if(curPlaying && curPlaying.startsWith(j+':')){ stopAll(); setPlaying(null); } else playSeq(d, d.lines.map((_, k) => k), 600); }
   else if(act==='rep'){ playSeq(DLG[b.dataset.d], [+b.dataset.i], 900, 3); toast('重複 3 次'); }
-  else if(act==='rv'){ const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
+  else if(act==='rv'){ if(e.target.closest('.bmbtn,.bmask,.texbmb')) return; const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
   else if(act==='idk'){
     const d = DLG[b.dataset.d], i = +b.dataset.i, k = d.id+':'+i;
     const sb = document.getElementById('src-'+k.replace(':','_'));
@@ -2128,7 +2136,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 ${APP_VER}（頁面最上方顯示版本號；有新版本時上方會出現「有新版本，按此更新」）</div>
+  <div class="foot">版本 ${APP_VER}（按 🏷 不會顯示句子文字；單語收合時也看得到例句的 🏷 數量，按一下直接跳過去）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

@@ -973,7 +973,7 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
   .btn.mydel{margin-left:0}
 }
 /* 🏷 時間註記（v3.42） */
-.ibtn.s.bmbtn{color:#8a6a1f;filter:grayscale(.6);opacity:.75}
+.ibtn.s.bmbtn{color:#8a6a1f;opacity:.95;border:1px dashed #e0c98a;background:#fffdf6}
 .ibtn.s.bmbtn.on{filter:none;opacity:1;width:auto;min-width:30px;padding:0 6px;gap:3px;display:inline-flex;align-items:center;border-radius:14px;background:#fff7e3;border-color:#e6c77a;font-size:13px}
 .bmbtn .bmt{font-size:11px;color:#7a5a12;white-space:nowrap;font-variant-numeric:tabular-nums}
 .bmask{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:4px 0 8px;padding:8px 10px;border:1px solid #e6c77a;background:#fffaf0;border-radius:10px}
@@ -1008,3 +1008,7 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .bmhome-kana{font-size:13px;color:var(--mute)}
 .bmhome-loc{font-weight:700}
 .bmhome-hint{margin:0 0 8px}
+/* v3.44：收合時顯示例句的 🏷 數量 */
+.texbmb{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:11px;background:#fff7e3;border:1px solid #e6c77a;color:#7a5a12;font-size:12px;font-weight:700;white-space:nowrap;margin-left:4px;cursor:pointer}
+.tcard:has(details.tex[open]) .texbmb{display:none}
+.texctl .texbmb{margin-left:0}
