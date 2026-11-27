@@ -708,7 +708,7 @@ function viewTango(n){
   <div class="player lhead-bar">
     <button class="btn sm" id="playAllBtn">▶ 全部播放</button>${infoTipHTML(playHelp)}${speedSegHTML()}
     <label class="texopt"><input type="checkbox" id="tangoExPlayCb" ${S.tangoExPlay!==false?'checked':''}> 含例句（單語＋3 句）</label>
-    ${tangoImgSizeHTML()}
+    ${T.noImg ? "" : tangoImgSizeHTML()}
   </div>
   <div class="small nowp" id="nowPlaying"></div>
   </div>
@@ -1995,7 +1995,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.39（新增「我的單語」：自己輸入新字，先聽再看，會同步到自己的帳號）</div>
+  <div class="foot">版本 3.40（新增第18課單語：61個字＋9個表現，先聽再看，每字3個例句、動詞變化）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
