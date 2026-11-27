@@ -99,4 +99,22 @@ t('typed words (v3.39 shape, no ref/src) pack exactly as before', () => {
   const p = M.packMine(store({ a: w('ねこ', 5, { ja: '猫' }) }));
   assert.deepStrictEqual(p.a, { ja: '猫', kana: 'ねこ', zh: 'x', t: 5, updatedAt: 5 });
 });
+
+/* v3.46：使用者改的 分類／用途（tg） */
+t('tg survives pack → merge → apply', () => {
+  const s = M.applyMine(store(), M.mergeMine(M.packMine(store({ a: w('つくえ', 5, { tg: { c: 'hm', u: 'dl', t: 5 } }) })), {}));
+  assert.deepStrictEqual(s.items.a.tg, { c: 'hm', u: 'dl', t: 5 });
+});
+t('old app copy without tg (even newer) does not wipe the user tags', () => {
+  const m = M.mergeMine(M.packMine(store({ a: w('つくえ', 9, { zh: 'desk' }) })), M.packMine(store({ a: w('つくえ', 5, { tg: { c: 'hm', u: 'dl', t: 5 } }) })));
+  assert.strictEqual(m.a.zh, 'desk'); assert.deepStrictEqual(m.a.tg, { c: 'hm', u: 'dl', t: 5 });
+});
+t('newer tag edit wins; clearing is kept as an empty edit', () => {
+  const m = M.mergeMine(M.packMine(store({ a: w('つくえ', 5, { tg: { c: 'hm', u: 'dl', t: 5 } }) })), M.packMine(store({ a: w('つくえ', 7, { tg: { c: '', u: '', t: 7 } }) })));
+  assert.deepStrictEqual(m.a.tg, { c: '', u: '', t: 7 });
+});
+t('mineSig changes when tags change', () => {
+  const s = store({ a: w('つくえ', 5, { tg: { c: 'hm', u: '', t: 5 } }) }); const a = M.mineSig(s);
+  s.items.a.tg = { c: 'hm,sc', u: '', t: 6 }; assert.notStrictEqual(M.mineSig(s), a);
+});
 console.log('\n' + passed + ' tests passed');

@@ -106,6 +106,42 @@
     }
     return null;
   }
+  /* v3.46 整理：詞性／分類／用途。T = BOOK.tags，V = BOOK.vocab。 */
+  const strip = t => String(t || '').replace(/[（(][^）)]*[）)]|［[^］]*］/g, '').replace(/[〜~。、，,！!？?…]/g, '').trim();
+  const POS_FROM_MY = { n: 'n', v1: 'v1', v2: 'v2', v3: 'v3', ai: 'ai', na: 'na', adv: 'adv', ex: 'g', x: 'x' };
+  function parseTag(s) { if (!s) return null; const p = String(s).split('|'); return { pos: p[0] || '', cat: (p[1] || '').split(',').filter(Boolean), use: (p[2] || '').split(',').filter(Boolean) }; }
+  function vocabKeys(V) { return V ? (V.__keys || Object.defineProperty(V, '__keys', { value: Object.keys(V), enumerable: false }).__keys) : []; }
+  function vocabTag(T, V, w) { if (!T || !V || !(w in V)) return null; const i = vocabKeys(V).indexOf(w); return i >= 0 ? parseTag(T.v[i]) : null; }
+  // 依字的寫法猜詞性（自己輸入、課本裡找不到時用）
+  function guessPos(ja, kana) {
+    const w = strip(ja || kana), k = strip(kana || ja);
+    if (!k) return 'x';
+    if (/[。？?！!]$/.test(String(ja || kana).trim()) || /です|ます|ください|ましょう/.test(w)) return 'g';
+    if (/^[ァ-ヺー・]+$/.test(w)) return 'k';
+    if (/する$/.test(k) || /くる$/.test(k) && /来る$/.test(w)) return 'v3';
+    const kj = /[一-龯々]/.test(w);
+    if (/[いきぎしじちにひびみりえけげせぜてでねへべめれ]る$/.test(k) && (kj || k.length > 2)) return 'v2';
+    if (/[うくぐすつぬぶむる]$/.test(k) && (kj || k.length > 2) && !/い$/.test(k)) return 'v1';
+    if (/い$/.test(k) && /[一-龯]い$|しい$/.test(w)) return 'ai';
+    return 'n';
+  }
+  // 一個字的自動標籤：ref 是 'v:<單字>' 或 't:<課>:<行>'（單語表；rawJa＝那一行的原文）；找不到就用日文／假名去對 BOOK.vocab
+  function autoTags(T, V, it, rawJa, lesson) {
+    const ref = (it && it.ref) || ''; let m, tg = null;
+    if ((m = ref.match(/^v:(.+)$/))) tg = vocabTag(T, V, m[1]);
+    if (!tg && rawJa != null && lesson != null && T && T.t) tg = parseTag(T.t[lesson + '|' + rawJa]);
+    const ja = strip(it && it.ja), kana = strip(it && it.kana);
+    if (!tg && ja) tg = vocabTag(T, V, ja);
+    if (!tg && kana) { tg = vocabTag(T, V, kana); if (!tg && V) { const w = vocabKeys(V).find(k => String(V[k].r || '').split('／').includes(kana) && (!ja || strip(k) === ja)); if (w) tg = vocabTag(T, V, w); } }
+    return tg;
+  }
+  // 實際使用的標籤：使用者改過（it.tg）> 自動；詞性：使用者選的 it.pos > 自動 > 猜
+  function effTags(T, V, it, rawJa, lesson) {
+    const a = autoTags(T, V, it, rawJa, lesson) || { pos: '', cat: [], use: [] };
+    const pos = (it && it.pos && POS_FROM_MY[it.pos]) || a.pos || guessPos(it && it.ja, it && it.kana);
+    const tg = it && it.tg && typeof it.tg === 'object' ? it.tg : null;
+    return { pos, cat: tg && tg.c != null ? String(tg.c).split(',').filter(Boolean) : a.cat, use: tg && tg.u != null ? String(tg.u).split(',').filter(Boolean) : a.use, auto: !!(a.pos), edited: !!tg };
+  }
   function newId() { return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  return { LAB, ORDER, conjugate, isKana, newId, furiOf };
+  return { LAB, ORDER, conjugate, isKana, newId, furiOf, strip, parseTag, guessPos, autoTags, effTags, vocabTag };
 });

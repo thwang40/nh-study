@@ -154,7 +154,7 @@
   }
 
   /* ---- 我的單語 ---- */
-  const MINE_FIELDS = ['ja', 'kana', 'zh', 'note', 'pos', 't', 'ref'];
+  const MINE_FIELDS = ['ja', 'kana', 'zh', 'note', 'pos', 't', 'ref', 'tg'];   // tg（v3.46）：使用者改的 分類／用途 {c:'fd,tr', u:'et', t}
   /* v3.45：src＝這個字是從哪些句子加入的 { [句子key]: {t 加入時間, u 更新時間, on 1/0} }。
      on:0 是「只移除這一句」的 tombstone；兩台裝置以句子 key 合併、較新者勝（不會因為字本身較新就丟掉另一台加的句子）。 */
   function cleanSrc(src) {
@@ -180,9 +180,12 @@
     const out = {};
     new Set([].concat(Object.keys(a), Object.keys(b))).forEach(id => {
       const x = a[id], y = b[id], w = pickNewer(x, y);
-      if (x && y && !x.deleted && !y.deleted && (x.src || y.src)) {
+      if (x && y && !x.deleted && !y.deleted && (x.src || y.src || x.tg || y.tg)) {
         const e = Object.assign({}, w), src = mergeSrc(x.src, y.src);
         if (src) e.src = src; else delete e.src;
+        // 舊版 App（3.45 以前）不認得 tg，上傳時會少掉這欄：「沒有 tg」只代表不知道，不代表清除（清除會存成 {c:'',u:''}）
+        if (e.tg == null) { const o = w === x ? y : x; if (o && o.tg != null) e.tg = o.tg; }
+        else if (x.tg && y.tg && (+(x.tg.t || 0)) !== (+(y.tg.t || 0))) e.tg = (+(x.tg.t || 0)) > (+(y.tg.t || 0)) ? x.tg : y.tg;
         e.updatedAt = Math.max(x.updatedAt || 0, y.updatedAt || 0);
         out[id] = e;
       } else out[id] = w;
@@ -221,7 +224,7 @@
   }
   function mineSig(store) {
     const it = (store && store.items) || {};
-    return Object.keys(it).sort().map(id => id + '@' + (it[id].u || 0) + (it[id].src ? '~' + Object.keys(it[id].src).sort().map(k => k + '=' + it[id].src[k].on + '.' + it[id].src[k].u).join(',') : '')).join('|');
+    return Object.keys(it).sort().map(id => id + '@' + (it[id].u || 0) + (it[id].src ? '~' + Object.keys(it[id].src).sort().map(k => k + '=' + it[id].src[k].on + '.' + it[id].src[k].u).join(',') : '') + (it[id].tg ? '#' + (it[id].tg.c || '') + '/' + (it[id].tg.u || '') + '/' + (it[id].tg.t || 0) : '')).join('|');
   }
 
   /* ---- 🏷 時間註記 ---- */
