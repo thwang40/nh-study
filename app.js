@@ -2,7 +2,7 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
-const APP_VER = '3.44';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
+const APP_VER = '3.45';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
@@ -163,14 +163,118 @@ let myFormFor = null;   // null＝沒開表單；''＝新增；id＝修改
 function mySave(quiet){ try{ localStorage.setItem(MY_KEY, JSON.stringify(MY)); }catch(e){ toast('儲存失敗（裝置空間不足？）'); } if(!quiet && window.NhSync) window.NhSync.notifyLocalChange(); }
 function myList(){ return Object.keys(MY.items).map(id => Object.assign({id}, MY.items[id])).sort((a, b) => (b.t||0) - (a.t||0)); }
 function myBaked(id, it){ const b = (B.mine||{})[id]; return (b && it && b.k === it.kana && (b.ja||'') === (it.ja||'')) ? b : null; }
+/* v3.45 參考印尼語 App「My Words」：課文句子裡按 ☆ 就把那個字（連同這一句）加進我的單語；
+   同一個字可以從很多句子加入，每句各自記加入時間（item.src），在我的單語裡每句都能聽（原本的課本音檔，離線可用）、跳回原句、單獨移除。
+   item.ref：'v:<單字>'（本文／實用會話的單字表）或 't:<課>:<行>'（單語頁）；有 ref 的字用課本的單語音檔。 */
+const VOCAB_IX = {}; Object.keys(B.vocab || {}).forEach((w, n) => { VOCAB_IX[w] = n; });
+const MYV = {sort:'new', filter:'all', mode:'list', qi:0, qk:{}};
+function myStrip(t){ return String(t||'').replace(/[（(][^）)]*[）)]/g, '').replace(/[〜~]/g, '').trim(); }
+function mySrcKeys(it){ const s = (it && it.src) || {}; return Object.keys(s).filter(k => s[k] && s[k].on !== 0 && bmLine(k)).sort((a, b) => (s[a].t||0) - (s[b].t||0) || (a < b ? -1 : 1)); }
+function myWordAu(it){
+  const r = (it && it.ref) || ''; let m;
+  if((m = r.match(/^v:(.+)$/)) && VOCAB_IX[m[1]] != null) return `audio/w_${VOCAB_IX[m[1]]}`;
+  if((m = r.match(/^t:(\d+):(\d+)$/)) && DLG['t'+m[1]] && DLG['t'+m[1]].lines[+m[2]]) return `audio/t${m[1]}_${m[2]}`;
+  return '';
+}
+function myRefInfo(kind, a, b){
+  if(kind === 'v'){ const v = B.vocab[a]; if(!v) return null; const kana = v.r || a; return {ref:'v:'+a, ja: a === kana ? '' : a, kana, zh: v.zh || '', l: v.l}; }
+  const T = DLG['t'+a], ln = T && T.lines[+b]; if(!ln) return null;
+  const ja = myStrip(ln.ja), kana = myStrip(ln.kana) || ja;
+  return {ref:`t:${a}:${+b}`, ja: ja === kana ? '' : ja, kana, zh: ln.zh || '', l: +a};
+}
+function myFind(info){
+  const ids = Object.keys(MY.items);
+  return ids.find(id => MY.items[id].ref === info.ref)
+    || ids.find(id => { const it = MY.items[id]; return myStrip(it.kana) === info.kana && myStrip(it.ja || '') === (info.ja || ''); }) || null;
+}
+function myTime(ts){ return ts ? bmTime(ts) : '日期不明'; }
+function mySrcLabel(key){ const x = bmLine(key); return x ? `第${x.d.l}課 ${bmLabel(key)}` : key; }
+function myLessons(it){ const s = new Set(); mySrcKeys(it).forEach(k => { const x = bmLine(k); if(x) s.add(x.d.l); });
+  const m = String(it.ref||'').match(/^t:(\d+):/); if(m) s.add(+m[1]); const v = /^v:/.test(it.ref||'') && B.vocab[it.ref.slice(2)]; if(v && typeof v.l === 'number') s.add(v.l); return [...s]; }
+function myStarHTML(kind, a, b, key, big){
+  const info = myRefInfo(kind, a, b); if(!info) return '';
+  const id = myFind(info), ks = id ? mySrcKeys(MY.items[id]) : [], on = ks.includes(key), n = ks.length, has = !!id;
+  const hint = on ? (n > 1 ? `共 ${n} 句` : '') : (n ? `已存 ${n} 句` : (has ? '已在我的單語' : ''));
+  const lab = on ? '已在我的單語（按一下只移除這一句）' : '加入我的單語（連同這一句）';
+  return `<button type="button" class="mystar${big?' big':''}${on?' on':''}" data-act="mystar" data-kind="${kind}" data-a="${esc(String(a))}" data-b="${esc(String(b))}" data-k="${key}" aria-pressed="${on}" aria-label="${lab}" title="${lab}">${on?'★':'☆'}${big?(on?' 已在我的單語':' 加入我的單語'):''}${hint?`<small>${hint}</small>`:''}</button>`;
+}
+function myPaintStars(){ document.querySelectorAll('[data-act="mystar"]').forEach(b => { if(b.dataset.armed) return; const t = document.createElement('span');
+  t.innerHTML = myStarHTML(b.dataset.kind, b.dataset.a, b.dataset.b, b.dataset.k, b.classList.contains('big')); if(t.firstElementChild) b.replaceWith(t.firstElementChild); });
+  const sl = document.querySelector('#side a[href="#/mine"]'); if(sl) sl.textContent = `⭐ 我的單語（${myList().length}）`; }
+function myClearRev(id){ Object.keys(reveal).forEach(k => { if(k.startsWith('mys_'+id+':')) delete reveal[k]; }); }
+function myStarTap(b){
+  const info = myRefInfo(b.dataset.kind, b.dataset.a, b.dataset.b), key = b.dataset.k; if(!info || !key) return;
+  let id = myFind(info); const now = Date.now();
+  if(!id){
+    id = MineCore.newId();
+    MY.items[id] = {ja: info.ja, kana: info.kana, zh: info.zh, ref: info.ref, t: now, u: now, src: {[key]: {t: now, u: now, on: 1}}}; delete MY.tomb[id];
+    toast('⭐ 已加入「我的單語」（連同這一句）');
+  } else {
+    const it = MY.items[id], live = mySrcKeys(it); it.src = it.src || {};
+    if(!live.includes(key)){ it.src[key] = {t: now, u: now, on: 1}; it.u = Math.max(now, (it.u||0) + 1); toast(`⭐ 已加入這一句・「${it.ja||it.kana}」共 ${live.length+1} 句`); }
+    else if(live.length > 1 || !it.ref){ it.src[key] = {t: it.src[key].t || 0, u: now, on: 0}; it.u = Math.max(now, (it.u||0) + 1); toast(live.length > 1 ? `已移除這一句・還有 ${live.length-1} 句` : '已移除這一句（字還在「我的單語」）'); }
+    else { myArm(b, id, '再按一次：刪除這個字？'); return; }
+    myClearRev(id);
+  }
+  mySave(); myRegister(); myPaintStars(); if(current && current.type === 'mine') myRerender();
+}
+// 兩段確認（像印尼語 App）：第 1 次按 → 按鈕變紅「再按一次」（5 秒內有效）；第 2 次按 → 下方出現「永久刪除？」小列（不是全螢幕）
+function myArm(b, id, label){
+  if(b.dataset.armed){ myDisarm(b); myShowAsk(b, id); return; }
+  document.querySelectorAll('[data-armed]').forEach(myDisarm);
+  b.dataset.armed = '1'; b.dataset.txt = b.innerHTML; b.classList.add('armed'); b.textContent = label || '再按一次刪除';
+  clearTimeout(b._t); b._t = setTimeout(() => { if(b.isConnected) myDisarm(b); }, 5000);
+}
+function myDisarm(b){ if(!b.dataset.armed) return; clearTimeout(b._t); delete b.dataset.armed; b.classList.remove('armed'); if(b.dataset.txt != null){ b.innerHTML = b.dataset.txt; delete b.dataset.txt; } }
+function myShowAsk(b, id){
+  document.querySelectorAll('.myask').forEach(x => x.remove());
+  const it = MY.items[id]; if(!it) return;
+  const box = document.createElement('div'); box.className = 'myask'; box.setAttribute('role', 'alert');
+  box.innerHTML = `<span>確定永久刪除「${esc(it.ja || it.kana)}」？出處句子、例句和這個字的複習紀錄會一起刪掉。</span><span class="myask-b"><button type="button" class="btn sm mydelok" data-act="mydelok" data-id="${id}">🗑 永久刪除</button><button type="button" class="btn sm ghost" data-act="mydelno">取消</button></span>`;
+  const row = b.closest('.myctl, .mysmeta') && b.closest('.line');
+  if(row){ const sb = row.nextElementSibling && row.nextElementSibling.classList.contains('srcbox') ? row.nextElementSibling : row; sb.insertAdjacentElement('afterend', box); }
+  else (b.closest('.mystarwrap, .myf-btns, .mypq-btns') || b.parentElement).insertAdjacentElement('afterend', box);
+  box.scrollIntoView({block:'nearest'});
+}
+function mySrcRemoveTap(b){
+  const id = b.dataset.id, key = b.dataset.k, it = MY.items[id]; if(!it) return;
+  const live = mySrcKeys(it);
+  if(live.length <= 1 && it.ref){ myArm(b, id, '再按一次：刪除這個字？'); return; }
+  if(!b.dataset.armed){ myArm(b, id, '確定移除？'); return; }
+  myDisarm(b); const now = Date.now(); it.src[key] = {t: (it.src[key]||{}).t || 0, u: now, on: 0}; it.u = Math.max(now, (it.u||0) + 1);
+  myClearRev(id); mySave(); myRegister(); toast('已移除這一句'); myRerender();
+}
+function myHL(ja, it){
+  const t = String(ja||''), w = myStrip((it && (it.ja || it.kana)) || '');
+  if(!w) return esc(t);
+  const cands = [w]; const kj = /[一-龯々〆ヵヶ]/;
+  for(let n = w.length - 1; n >= 1; n--){ const c = w.slice(0, n); if(kj.test(w) ? kj.test(c) : n >= Math.max(2, w.length - 2)) cands.push(c); }
+  const kana = myStrip((it && it.kana) || ''); if(kana && kana !== w) cands.push(kana);
+  for(const c of cands){ const i = t.indexOf(c); if(c && i >= 0) return esc(t.slice(0, i)) + `<span class="tw">${esc(c)}</span>` + esc(t.slice(i + c.length)); }
+  return esc(t);
+}
+function mySrcRowHTML(d, k){
+  const ln = d.lines[k], key = d.id+':'+k, lv = (reveal[key]||0), it = MY.items[d.myId] || {};
+  const ja = ln.furi ? furiHTML(ln.furi) : myHL(ln.ja, it);
+  const body = lv>=1 ? `<div class="ja">${ja}</div>${S.showKana&&ln.kana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja);
+  return `<div class="line srow mysrow" data-key="${key}">
+    <div class="tnum">${k+1}</div>
+    <div class="mysmain"><div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
+      <div class="mysmeta"><span class="mysfrom">${esc(mySrcLabel(ln.srcKey))}</span><span class="mystime">加入 ${esc(myTime(ln.t))}</span><button type="button" class="mysgo" data-act="mygo" data-k="${ln.srcKey}" title="跳到課本裡的這一句（字一樣先藏著）">↗ 原句</button><button type="button" class="mysrm" data-act="mysrm" data-id="${d.myId}" data-k="${ln.srcKey}" title="只移除這一句">移除</button></div></div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${k}" aria-label="播放這一句" title="播放這一句（課本音檔）">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${k}" aria-label="重複三次" title="重複三次">🔁</button></div>
+  </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
+}
 function myRegister(){
-  Object.keys(DLG).forEach(k => { if(/^my[ef]?_/.test(k)) delete DLG[k]; });
+  Object.keys(DLG).forEach(k => { if(/^my[efs]?_/.test(k)) delete DLG[k]; });
   const sp = {A:{name:'我的單語', voice:'f'}};
   Object.keys(MY.items).forEach(id => {
     const it = MY.items[id], b = myBaked(id, it);
-    const ja = it.ja || it.kana;
-    DLG['my_'+id] = {id:'my_'+id, l:0, mine:true, myId:id, tts: !(b && b.w), title:'我的單語', scene:'', sp,
-      lines:[{s:'A', ja, kana:it.kana, zh:it.zh||'', say:it.kana, g:[], v:[], note:it.note||''}]};
+    const ja = it.ja || it.kana, au = myWordAu(it);
+    DLG['my_'+id] = {id:'my_'+id, l:0, mine:true, myId:id, tts: !(b && b.w) && !au, title:'我的單語', scene:'', sp,
+      lines:[{s:'A', ja, kana:it.kana, zh:it.zh||'', say:it.kana, g:[], v:[], note:it.note||'', au: (b && b.w) ? '' : au}]};
+    const sk = mySrcKeys(it);
+    if(sk.length) DLG['mys_'+id] = {id:'mys_'+id, l:0, mine:true, mySrc:true, myId:id, tts:false, title:'我的單語出處句子', scene:'', sp,
+      lines: sk.map(k => { const x = bmLine(k), ln = x.ln; return {s:'A', ja:ln.ja, furi:ln.furi||'', kana:ln.kana||'', zh:ln.zh||'', say:ln.say||ln.ja, au:`audio/${x.d.id}_${x.i}`, srcKey:k, t:(it.src[k]||{}).t||0, g:[], v:[]}; })};
     if(b && b.ex && b.ex.length) DLG['mye_'+id] = {id:'mye_'+id, l:0, mine:true, myEx:true, myId:id, tts:false, title:'我的單語例句', scene:'', sp,
       lines: b.ex.map((e, k) => ({s:'A', ja:e.ja, furi:e.furi||'', kana:e.kana||'', zh:e.zh||'', say:e.ja, ex:k+1, w:id, g:[], v:[]}))};
     const g = MY_G[it.pos], forms = g && window.MineCore ? MineCore.conjugate(it.ja, it.kana, g) : null;
@@ -322,19 +426,23 @@ function myRowHTML(d){
   const ed = DLG['mye_'+id];
   const revC = ed ? ed.lines.filter((_, k) => S.unf[ed.id+':'+k]).length : 0;
   const open = ed && texCardOpen(key);
+  const ns = DLG['mys_'+id] ? DLG['mys_'+id].lines.length : 0;
   const ctl = ed ? `<span class="texctl"><button type="button" class="texchev${revC?' rev':''}" data-act="texone" aria-expanded="${open?'true':'false'}" aria-label="${open?'收合句子':'展開句子'}" title="${open?'收合句子':'展開句子'}"><span class="texchev-t">例句</span></button>${texRevBadgeHTML(revC)}</span>`
-    : `<span class="texctl"><span class="mypend" title="跟我說「我的單語有新字」，就會配上自然語音和 3 句例句">${d.tts?'裝置語音・':''}例句準備中</span></span>`;
+    : (ns && !d.tts) ? '' : `<span class="texctl"><span class="mypend" title="跟我說「我的單語有新字」，就會配上自然語音和 3 句例句">${d.tts?'裝置語音・':''}${ns?'':'例句準備中'}</span></span>`;
+  const meta = `<div class="mymeta">加入 ${esc(myTime(it.t))}${ns ? `・出處 ${ns} 句` : ''}${it.ref ? '' : '・自己輸入'}</div>`;
   return `<div class="line srow trow twd myrow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tleft"><div class="tnum">${d.myN||''}</div></div>
-    <div class="twmain"><div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>${ctl}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="0" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="0" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="myedit" data-id="${id}" aria-label="修改這個字" title="修改／刪除">✏️</button></div>
+    <div class="twmain"><div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>${ctl}${meta}</div>
+    <div class="sbtns myctl"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="0" aria-label="播放" title="播放${d.tts?'（裝置語音）':''}">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="0" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="myedit" data-id="${id}" aria-label="修改這個字" title="修改">✏️</button><button class="ibtn s myrm" data-act="myrm" data-id="${id}" aria-label="刪除這個字" title="刪除（要確認兩次）">🗑</button></div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function myCardHTML(it){
   const id = it.id, d = DLG['my_'+id]; if(!d) return '';
   const ed = DLG['mye_'+id], fd = DLG['myf_'+id];
   const revC = ed ? ed.lines.filter((_, k) => S.unf[ed.id+':'+k]).length : 0;
+  const sd = DLG['mys_'+id];
   return `<div class="tcard mycard${revC?' has-exrev':''}" data-my="${id}">${myRowHTML(d)}
+    ${sd ? `<div class="mysents"><div class="mysh">出處句子 ${sd.lines.length} 句（課本音檔・先聽再看）</div>${sd.lines.map((_, k) => mySrcRowHTML(sd, k)).join('')}</div>` : ''}
     ${ed ? `<details class="tex"><summary class="texsr">聽力句子</summary><div class="texlines">${ed.lines.map((_, k) => tangoExRowHTML(ed, k)).join('')}</div></details>` : ''}
     ${fd ? vfDetailsHTML(fd.id, (VF_GL[MY_G[it.pos]]||'') + (fd.tts ? '・裝置語音' : '')) : ''}
     ${myFormFor === id ? myFormHTML(it) : ''}</div>`;
@@ -388,9 +496,9 @@ function mySubmit(f){
 function myDelete(id){
   if(!MY.items[id]) return;
   delete MY.items[id]; MY.tomb[id] = Date.now();
-  const pre = ['my_'+id+':', 'mye_'+id+':', 'myf_'+id+':'];
+  const pre = ['my_'+id+':', 'mye_'+id+':', 'myf_'+id+':', 'mys_'+id+':'];
   ['unf', 'review'].forEach(kind => Object.keys(S[kind]||{}).forEach(k => { if(pre.some(p => k.startsWith(p))){ if(window.SyncMerge) SyncMerge.tomb(S, kind, k); delete S[kind][k]; } }));
-  save(); myFormFor = null; mySave(); myRegister(); toast('已刪除'); myRerender();
+  save(); myFormFor = null; myClearRev(id); delete MYV.qk[id]; mySave(); myRegister(); toast('已刪除'); myPaintStars(); myRerender();
 }
 function myRerender(){ if(current && current.type==='mine'){ const y = scrollY; keepReveal = true; try{ viewMine(); } finally { keepReveal = false; } window.scrollTo(0, y); } }
 function myExport(){
@@ -401,28 +509,69 @@ function myExport(){
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => toast(`已匯出 ${data.items.length} 個字（已下載 JSON，也複製到剪貼簿）`), () => toast(`已匯出 ${data.items.length} 個字（已下載 JSON）`));
   else toast(`已匯出 ${data.items.length} 個字（已下載 JSON）`);
 }
+function myView(){
+  const all = myList();
+  const lessons = [...new Set([].concat(...all.map(myLessons)))].sort((x, y) => x - y);
+  if(MYV.filter !== 'all' && MYV.filter !== 'typed' && !lessons.includes(+MYV.filter.slice(1))) MYV.filter = 'all';
+  let L = all.filter(it => MYV.filter === 'all' ? true : MYV.filter === 'typed' ? !it.ref : myLessons(it).includes(+MYV.filter.slice(1)));
+  if(MYV.sort === 'old') L = L.slice().sort((x, y) => (x.t||0) - (y.t||0));
+  else if(MYV.sort === 'kana') L = L.slice().sort((x, y) => String(x.kana||'').localeCompare(String(y.kana||''), 'ja'));
+  return {all, L, lessons};
+}
+function mySeg(act, cur, opts){ return `<span class="seg myseg">${opts.map(([v, lab]) => `<button type="button" class="${cur===v?'on':''}" data-act="${act}" data-v="${v}" aria-pressed="${cur===v}">${esc(lab)}</button>`).join('')}</span>`; }
+function myPracticeHTML(L){
+  if(!L.length) return '';
+  const n = L.length, qi = ((MYV.qi % n) + n) % n, it = L[qi], id = it.id, d = DLG['my_'+id]; if(!d) return '';
+  d.myN = qi + 1;
+  const sd = DLG['mys_'+id], ed = DLG['mye_'+id];
+  let sent = '', ns = 0;
+  if(sd){ ns = sd.lines.length; let k = MYV.qk[id]; if(k == null || k >= ns){ k = Math.floor(Math.random() * ns); MYV.qk[id] = k; } sent = `<div class="mysents">${mySrcRowHTML(sd, k)}</div>`; }
+  else if(ed){ ns = ed.lines.length; let k = MYV.qk[id]; if(k == null || k >= ns){ k = Math.floor(Math.random() * ns); MYV.qk[id] = k; } sent = `<div class="mysents"><div class="mysh">例句</div>${tangoExRowHTML(ed, k)}</div>`; }
+  else sent = `<div class="small mute mynos">這個字還沒有句子（在課文的 🙋 出處裡按 ☆ 加入，或跟我說幫你配例句）。</div>`;
+  const lab = myLessons(it).map(l => lessonLabel(l)).join('・') || '自己輸入';
+  return `<div class="card mypq" data-my="${id}">
+    <div class="mypq-h"><b>${qi+1} / ${n}</b><span class="small mute">・${esc(lab)}・加入 ${esc(myTime(it.t))}</span></div>
+    <div class="small mute">先按 🔊 聽，想一想意思，再點灰條：第 1 次日文＋假名、第 2 次中文。</div>
+    <div class="tlist timg-sm mylist"><div class="tcard mycard">${myRowHTML(d)}${sent}</div></div>
+    <div class="mypq-btns"><button type="button" class="btn sm ghost" data-act="myprev">◀ 上一個</button><button type="button" class="btn sm" data-act="mynext">下一個 ▶</button>${ns > 1 ? `<button type="button" class="btn sm ghost" data-act="myswap">🔀 換一句</button>` : ''}<button type="button" class="btn sm ghost mydel" data-act="myrm" data-id="${id}">🗑 刪除</button></div>
+  </div>`;
+}
 function viewMine(){
   renderSide('mine'); current = {type:'mine'}; if(!keepReveal) reveal = {};
-  const L = myList(); L.forEach((it, n) => { const d = DLG['my_'+it.id]; if(d) d.myN = n+1; });
-  const pend = L.filter(it => DLG['my_'+it.id] && (DLG['my_'+it.id].tts || !DLG['mye_'+it.id])).length;
+  myRegister();
+  const {all, L, lessons} = myView();
+  L.forEach((it, n) => { const d = DLG['my_'+it.id]; if(d) d.myN = n+1; });
+  const pend = all.filter(it => DLG['my_'+it.id] && (DLG['my_'+it.id].tts || (!DLG['mye_'+it.id] && !DLG['mys_'+it.id]))).length;
+  const nsent = all.reduce((a, it) => a + (DLG['mys_'+it.id] ? DLG['mys_'+it.id].lines.length : 0), 0);
   const signed = window.NhSync && NhSync.configReady && NhSync.configReady();
+  const prac = MYV.mode === 'practice';
+  const tools = all.length ? `<div class="mytools">
+      ${mySeg('mymode', MYV.mode, [['list', '📋 清單'], ['practice', '🎧 練習（一次一個字）']])}
+      ${mySeg('mysort', MYV.sort, [['new', '最新加入'], ['old', '最早加入'], ['kana', '五十音']])}
+      ${(lessons.length || all.some(it => !it.ref)) ? mySeg('myfilter', MYV.filter, [['all', '全部']].concat(lessons.map(l => ['L'+l, lessonLabel(l)])).concat(all.some(it => !it.ref) ? [['typed', '自己輸入']] : [])) : ''}
+    </div>` : '';
   $('#view').innerHTML = `
   <div class="lhead-block">
   <div class="crumb"><a href="#/">首頁</a> › 我的單語</div>
   <h1>⭐ 我的單語</h1>
   <div class="lhead-sub"><span class="kana">わたしのたんご</span><span class="lhead-zh">自己加的字・和課本單語分開放</span></div>
   <div class="player lhead-bar">
-    ${L.length ? `<button class="btn sm" id="playAllBtn">▶ 全部播放</button>` : ''}${speedSegHTML()}
+    ${L.length ? `<button class="btn sm" id="playAllBtn">▶ ${prac ? '播放這個字和句子' : '全部播放'}</button>` : ''}${speedSegHTML()}
     <button type="button" class="btn sm alt" data-act="myadd">＋ 新增單語</button>
-    ${L.length ? `<button type="button" class="btn sm ghost" data-act="myexport" title="下載成 JSON 檔（也會複製到剪貼簿）">⤓ 匯出</button>` : ''}
+    ${all.length ? `<button type="button" class="btn sm ghost" data-act="myexport" title="下載成 JSON 檔（也會複製到剪貼簿）">⤓ 匯出</button>` : ''}
   </div></div>
   ${myFormFor === '' ? `<div class="card myformcard">${myFormHTML(null)}</div>` : ''}
-  ${L.length ? `<p class="small mute mylead">先聽，再點灰條：第 1 次顯示日文＋假名、第 2 次加中文。${pend ? `有 ${pend} 個字還沒配自然語音和例句（先用裝置內建語音）。` : ''}</p>
-  <div class="tlist timg-sm mylist" data-blk><div class="blkbar">${blkBtn(false)}</div>${L.map(myCardHTML).join('')}</div>`
-  : (myFormFor === '' ? '' : `<div class="card myempty"><div class="myempty-ic">⭐</div><div><b>還沒有自己的單語</b><div class="small mute">課本以外看到、聽到的新字，按「＋ 新增單語」輸入日文、假名、中文，就能在這裡先聽再看。</div></div></div>`)}
+  ${all.length ? `<p class="small mute mylead">共 ${all.length} 個字${nsent ? `・${nsent} 句出處句子` : ''}。先聽，再點灰條：第 1 次顯示日文＋假名、第 2 次加中文。在本文、實用會話、單語的 🙋 出處裡按 ☆ 就能把字連同那一句加進來；同一個字可以從很多句子加入。${pend ? `有 ${pend} 個字還沒配自然語音或例句（先用裝置內建語音）。` : ''}</p>
+  ${tools}
+  ${!L.length ? `<div class="card small mute">這個篩選裡沒有字。</div>` : prac ? myPracticeHTML(L) : `<div class="tlist timg-sm mylist" data-blk><div class="blkbar">${blkBtn(false)}</div>${L.map(myCardHTML).join('')}</div>`}`
+  : (myFormFor === '' ? '' : `<div class="card myempty"><div class="myempty-ic">⭐</div><div><b>還沒有自己的單語</b><div class="small mute">兩種加法：① 在本文、實用會話、單語的句子按 🙋 打開出處，在單字旁按 ☆，會連同那一句一起存；② 課本以外看到、聽到的新字，按「＋ 新增單語」輸入日文、假名、中文。</div></div></div>`)}
   <p class="small mute myprivacy">🔒 這些字存在這台裝置；${signed ? '登入同步後也會存到你自己的帳號，其他同學看不到。' : '其他同學看不到。'}</p>`;
   const pb = $('#playAllBtn');
-  if(pb) pb.onclick = () => { if(curPlaying){ stopAll(); setPlaying(null); return; } playSeqMix(myList().map(it => ({d: DLG['my_'+it.id], i: 0})).filter(x => x.d), 900); };
+  if(pb) pb.onclick = () => { if(curPlaying){ stopAll(); setPlaying(null); return; }
+    if(prac){ const n = L.length, it = L[((MYV.qi % n) + n) % n], items = [{d: DLG['my_'+it.id], i: 0}], k = MYV.qk[it.id];
+      if(DLG['mys_'+it.id]) items.push({d: DLG['mys_'+it.id], i: k||0}); else if(DLG['mye_'+it.id]) items.push({d: DLG['mye_'+it.id], i: k||0});
+      playSeqMix(items.filter(x => x.d && x.d.lines[x.i]), 900); return; }
+    playSeqMix(myView().L.map(it => ({d: DLG['my_'+it.id], i: 0})).filter(x => x.d), 900); };
   const f = document.querySelector('form.myform'); if(f && !keepReveal){ const inp = f.querySelector(f.dataset.id ? 'input[name="zh"]' : 'input[name="ja"]'); if(inp) setTimeout(() => inp.focus({preventScroll:true}), 30); }
 }
 document.addEventListener('submit', e => { const f = e.target.closest && e.target.closest('form.myform'); if(!f) return; e.preventDefault(); mySubmit(f); });
@@ -430,7 +579,17 @@ function myAct(act, b){
   if(act==='myadd'){ myFormFor = ''; myRerender(); const f = document.querySelector('form.myform'); if(f){ f.scrollIntoView({block:'nearest'}); const i = f.querySelector('input[name="ja"]'); if(i) i.focus({preventScroll:true}); } }
   else if(act==='myedit'){ myFormFor = (myFormFor === b.dataset.id) ? null : b.dataset.id; myRerender(); }
   else if(act==='mycancel'){ myFormFor = null; myRerender(); }
-  else if(act==='mydel'){ if(b.dataset.armed){ myDelete(b.dataset.id); } else { b.dataset.armed = '1'; b.textContent = '確定刪除？再按一次'; b.classList.add('armed'); setTimeout(() => { if(b.isConnected){ delete b.dataset.armed; b.textContent = '🗑 刪除'; b.classList.remove('armed'); } }, 4000); } }
+  else if(act==='mydel' || act==='myrm') myArm(b, b.dataset.id, b.classList.contains('ibtn') ? '再按一次' : '確定刪除？再按一次');
+  else if(act==='mydelok'){ document.querySelectorAll('.myask').forEach(x => x.remove()); myDelete(b.dataset.id); }
+  else if(act==='mydelno'){ document.querySelectorAll('.myask').forEach(x => x.remove()); }
+  else if(act==='mystar') myStarTap(b);
+  else if(act==='mysrm') mySrcRemoveTap(b);
+  else if(act==='mygo') bmGo(b.dataset.k);
+  else if(act==='mysort'){ MYV.sort = b.dataset.v; MYV.qi = 0; viewMine(); }
+  else if(act==='myfilter'){ MYV.filter = b.dataset.v; MYV.qi = 0; viewMine(); }
+  else if(act==='mymode'){ MYV.mode = b.dataset.v; MYV.qi = 0; stopAll(); viewMine(); }
+  else if(act==='mynext' || act==='myprev'){ stopAll(); MYV.qi += act==='mynext' ? 1 : -1; reveal = {}; viewMine(); }
+  else if(act==='myswap'){ const card = b.closest('[data-my]'), id = card && card.dataset.my; if(id){ const sd = DLG['mys_'+id] || DLG['mye_'+id], n = sd ? sd.lines.length : 0; if(n > 1){ MYV.qk[id] = ((MYV.qk[id]||0) + 1) % n; Object.keys(reveal).forEach(k => { if(k.startsWith(sd.id+':')) delete reveal[k]; }); myRerender(); } } }
   else if(act==='mytts'){ const f = b.closest('form.myform'); const v = f && myFormVals(f); if(v && (v.kana||v.ja)){ stopAll(); speakTTS(v.kana || v.ja, playToken); } else toast('先填假名'); }
   else if(act==='myexport') myExport();
 }
@@ -573,7 +732,7 @@ async function playLine(d, i, token){
   const key = d.id + ':' + i; setPlaying(key);
   const ln = d.lines[i];
   if(S.engine === 'mp3' && !d.tts){
-    try{ await playMP3(`audio/${d.id}_${i}${S.speed<1?'_s':''}.mp3`, token); }
+    try{ await playMP3(`${ln.au || `audio/${d.id}_${i}`}${S.speed<1?'_s':''}.mp3`, token); }
     catch(e){ if(token !== playToken) return false; toast('MP3 載入失敗，改用裝置語音'); await speakTTS(ln.say||ln.ja, token); }
   } else { await speakTTS(ln.say||ln.ja, token); }
   if(token !== playToken) return false;
@@ -670,14 +829,15 @@ function tangoSrcHTML(d, i){
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》第${d.l}課「${esc(L.t)}」（${esc(L.zh)}）</div>`;
   h += `<div style="margin-top:4px"><span class="tag txt">單語</span> ${esc(src)}・<b>p.${ln.pg||d.src.page}</b>・${esc(ln.kind==='expr' ? 'いろいろな表現 '+ln.no : '單語 '+ln.no)}</div>`;
   h += `<div class="small mute" style="margin-top:6px">先聽再看。點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文。</div>`;
-  return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/t/${d.l}">🎧 第${d.l}課全部單語 ›</a></div></div>`;
+  return h + `<div class="row mystarwrap" style="margin-top:8px">${ln.kind==='expr' ? '' : myStarHTML('t', d.l, i, d.id+':'+i, true)}<a class="btn sm ghost" style="text-decoration:none" href="#/t/${d.l}">🎧 第${d.l}課全部單語 ›</a></div></div>`;
 }
 function tangoExSrcHTML(d, i){
   const ln = d.lines[i], L = LESSON[d.l];
   let h = `<div class="src"><div>📖 <b>出處</b>：《${esc(B.title)}》第${d.l}課「${esc(L.t)}」（${esc(L.zh)}）</div>`;
   h += `<div style="margin-top:4px"><span class="tag xtra">單語例句（自編・第1～${d.l}課程度）</span> 對應單語 ${esc(String(ln.w))}・例句 ${esc(String(ln.ex))}</div>`;
   h += `<div class="small mute" style="margin-top:6px">先聽再看。點文字：第 1 次顯示日文（漢字＋假名）、第 2 次加中文。紅字粗體是本課這個單語。</div>`;
-  return h + `<div class="row" style="margin-top:8px"><a class="btn sm ghost" style="text-decoration:none" href="#/t/${d.l}">🎧 第${d.l}課全部單語 ›</a></div></div>`;
+  const T = DLG['t'+d.l], wi = T ? T.lines.findIndex(x => x.no === ln.w && x.kind !== 'expr') : -1;
+  return h + `<div class="row mystarwrap" style="margin-top:8px">${wi >= 0 ? myStarHTML('t', d.l, wi, d.id+':'+i, true) : ''}<a class="btn sm ghost" style="text-decoration:none" href="#/t/${d.l}">🎧 第${d.l}課全部單語 ›</a></div></div>`;
 }
 function srcHTML(d, i){
   if(d.mine) return mySrcHTML(d, i);
@@ -696,8 +856,8 @@ function srcHTML(d, i){
       h += `<div class="gent"><span class="tag">${gPatHTML(k, gLabel(k))}</span><div class="small">${esc(g.zh)}</div><div class="small ex">課本例句（p.${g.pg}）：${esc(g.ex)}</div></div>`; });
   }
   if(ln.v.length){
-    h += `<div class="srch"><b>單字</b></div><div class="vocab">` + ln.v.map(w => { const v = B.vocab[w]; if(!v) return '';
-      return `<span>${esc(w)}${v.r!==w?`（${esc(v.r)}）`:''}＝${esc(v.zh)} <em>${esc(vLabel(w))}</em></span>`; }).join('') + `</div>`;
+    h += `<div class="srch"><b>單字</b> <span class="small mute">按 ☆ 加入我的單語（連同這一句）</span></div><div class="vocab">` + ln.v.map(w => { const v = B.vocab[w]; if(!v) return '';
+      return `<span class="mystarwrap">${myStarHTML('v', w, '', d.id+':'+i)}${esc(w)}${v.r!==w?`（${esc(v.r)}）`:''}＝${esc(v.zh)} <em>${esc(vLabel(w))}</em></span>`; }).join('') + `</div>`;
   }
   if(ln.note) h += `<div class="small srtip">💡 ${esc(ln.note)}</div>`;
   h += drillsHTML(ln.g);
@@ -772,7 +932,7 @@ function viewHome(){
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${revCount()}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
-  <a class="card mxhome myhome" href="#/mine"><div class="mxhome-ic">⭐</div><div><div class="ltitle">我的單語</div><div class="small mute">${myList().length ? `已有 ${myList().length} 個自己加的字・` : ''}自己輸入課本以外的新字（日文、假名、中文），先聽再看；只存在你的裝置與你的同步帳號。</div></div></a>
+  <a class="card mxhome myhome" href="#/mine"><div class="mxhome-ic">⭐</div><div><div class="ltitle">我的單語</div><div class="small mute">${myList().length ? `已有 ${myList().length} 個自己加的字・` : ''}在課文 🙋 出處裡按 ☆ 存字（連同那一句），或自己輸入新字；先聽再看、可練習；只存在你的裝置與你的同步帳號。</div></div></a>
   ${MIX.length?`<a class="card mxhome" href="#/mix"><div class="mxhome-ic">🎧</div><div><div class="ltitle">綜合聽力測驗</div><div class="small mute">自己選課（單選、複選、連選），用這幾課的單語、本文、文型組成新句子，先聽再看；下拉看用到的單語、文型與動詞・形容詞變化。</div></div><span class="mxhome-go">›</span></a>`:''}
   <div class="small" style="margin:-6px 0 12px"><a href="#/p/b/0" style="color:inherit">📚 翻閱整本課本（全部 272 頁・含第13–18課與附錄）›</a></div>
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
@@ -1497,7 +1657,7 @@ function rerenderLine(d, i, opts){
   const box = sb ? sb.innerHTML : '';
   const hiddenAgain = S.listenFirst && !(reveal[key]||0);
   if(el.classList.contains('srow')){   // 本文／文型／實用會話: panel is a sibling of the row, keep it
-    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : el.classList.contains('exrow') ? tangoExRowHTML(d, i) : el.classList.contains('myrow') ? myRowHTML(d, i) : el.classList.contains('trow') ? tangoRowHTML(d, i) : rowHTML(d, i);
+    const tmp = document.createElement('div'); tmp.innerHTML = el.classList.contains('drow') ? drillRowHTML(d, i) : el.classList.contains('mysrow') ? mySrcRowHTML(d, i) : el.classList.contains('exrow') ? tangoExRowHTML(d, i) : el.classList.contains('myrow') ? myRowHTML(d, i) : el.classList.contains('trow') ? tangoRowHTML(d, i) : rowHTML(d, i);
     el.replaceWith(tmp.querySelector('.srow'));
     if(box && hiddenAgain){ closeSrc(key); return; }
     if(box) setIdk(document.querySelector(`.line[data-key="${key}"]`), true);
@@ -2006,7 +2166,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if(!b) return;
   const act = b.dataset.act;
   if(/^mx/.test(act) && act!=='mx'){ mixAct(act, b, e); return; }
-  if(/^my(add|edit|cancel|del|tts|export)$/.test(act)){ e.preventDefault(); myAct(act, b); return; }
+  if(/^my(add|edit|cancel|del|tts|export|star|rm|srm|go|delok|delno|sort|filter|mode|next|prev|swap)$/.test(act)){ e.preventDefault(); e.stopPropagation(); myAct(act, b); return; }
   if(/^bm(|upd|del|cancel|rv|go)$/.test(act)){ e.preventDefault(); e.stopPropagation(); bmAct(act, b); return; }
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
   else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(k.split(':')[0]); }
@@ -2136,7 +2296,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 ${APP_VER}（按 🏷 不會顯示句子文字；單語收合時也看得到例句的 🏷 數量，按一下直接跳過去）</div>
+  <div class="foot">版本 ${APP_VER}（我的單語：在課文 🙋 出處按 ☆ 存字連同句子、每句記加入時間、清單／練習、篩選排序）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

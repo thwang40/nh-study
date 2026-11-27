@@ -60,4 +60,43 @@ t('mineSig changes only when words change', () => {
   assert.strictEqual(M.mineSig(s), a);
   s.items.b = w('いぬ', 6); assert.notStrictEqual(M.mineSig(s), a);
 });
+
+/* v3.45：從課文句子加入（ref ＋ src 句子清單） */
+const sw = (u, srcs, extra) => w('そつぎょうする', u, Object.assign({ ja: '卒業する', ref: 'v:卒業する', src: srcs }, extra || {}));
+t('ref and src survive pack → merge → apply', () => {
+  const s0 = store({ a: sw(5, { '11-T1:1': { t: 5, u: 5, on: 1 } }) });
+  const s = M.applyMine(store(), M.mergeMine(M.packMine(s0), M.emptyPacked().mine || {}));
+  assert.strictEqual(s.items.a.ref, 'v:卒業する');
+  assert.deepStrictEqual(s.items.a.src, { '11-T1:1': { t: 5, u: 5, on: 1 } });
+});
+t('sentences added on two devices are unioned (not lost to the newer word)', () => {
+  const m = M.mergeMine(M.packMine(store({ a: sw(5, { '11-T1:1': { t: 5, u: 5, on: 1 } }) })),
+                        M.packMine(store({ a: sw(9, { 't11e:12': { t: 9, u: 9, on: 1 } }) })));
+  assert.deepStrictEqual(Object.keys(m.a.src).sort(), ['11-T1:1', 't11e:12']);
+  assert.strictEqual(m.a.updatedAt, 9);
+});
+t('removing one sentence (on:0, newer) wins over the older live copy', () => {
+  const m = M.mergeMine(M.packMine(store({ a: sw(8, { '11-T1:1': { t: 5, u: 8, on: 0 }, 't11e:12': { t: 6, u: 6, on: 1 } }) })),
+                        M.packMine(store({ a: sw(6, { '11-T1:1': { t: 5, u: 5, on: 1 }, 't11e:12': { t: 6, u: 6, on: 1 } }) })));
+  assert.strictEqual(m.a.src['11-T1:1'].on, 0);
+  assert.strictEqual(m.a.src['t11e:12'].on, 1);
+});
+t('deleting the whole word still beats sentence edits made before the delete', () => {
+  const m = M.mergeMine(M.packMine(store({}, { a: 20 })), M.packMine(store({ a: sw(9, { 'x:1': { t: 9, u: 9, on: 1 } }) })));
+  assert.ok(m.a.deleted);
+});
+t('old app copy without src (same time) does not wipe the sentences', () => {
+  const oldCopy = M.packMine(store({ a: w('そつぎょうする', 9, { ja: '卒業する', ref: 'v:卒業する' }) }));
+  delete oldCopy.a.ref;
+  const m = M.mergeMine(oldCopy, M.packMine(store({ a: sw(9, { '11-T1:1': { t: 9, u: 9, on: 1 } }) })));
+  assert.ok(m.a.src && m.a.src['11-T1:1'].on === 1);
+});
+t('mineSig changes when a sentence is added or removed', () => {
+  const s = store({ a: sw(5, { '11-T1:1': { t: 5, u: 5, on: 1 } }) }); const a = M.mineSig(s);
+  s.items.a.src['11-T1:1'] = { t: 5, u: 7, on: 0 }; assert.notStrictEqual(M.mineSig(s), a);
+});
+t('typed words (v3.39 shape, no ref/src) pack exactly as before', () => {
+  const p = M.packMine(store({ a: w('ねこ', 5, { ja: '猫' }) }));
+  assert.deepStrictEqual(p.a, { ja: '猫', kana: 'ねこ', zh: 'x', t: 5, updatedAt: 5 });
+});
 console.log('\n' + passed + ' tests passed');

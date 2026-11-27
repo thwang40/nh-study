@@ -1012,3 +1012,42 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .texbmb{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:11px;background:#fff7e3;border:1px solid #e6c77a;color:#7a5a12;font-size:12px;font-weight:700;white-space:nowrap;margin-left:4px;cursor:pointer}
 .tcard:has(details.tex[open]) .texbmb{display:none}
 .texctl .texbmb{margin-left:0}
+
+/* v3.45 我的單語（參考印尼語 App My Words）：☆ 存字、出處句子、清單／練習、兩段確認刪除 */
+.mystar{font:inherit;font-size:15px;line-height:1;color:#8a6a1f;background:#fffdf6;border:1px dashed #e0c98a;border-radius:8px;padding:4px 7px;margin-right:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
+.mystar.on{color:#fff;background:#c9a13b;border:1px solid #b88f2c}
+.mystar small{font-size:11px;font-weight:700;opacity:.85}
+.mystar.big{font-size:14px;font-weight:700;padding:6px 10px}
+.mystar.armed,.ibtn.s.myrm.armed,.mysrm.armed,.btn.armed{background:#b23b1e!important;color:#fff!important;border-color:#b23b1e!important;width:auto;padding:0 8px;font-size:13px}
+.mystarwrap{display:inline-flex;align-items:center;flex-wrap:wrap;gap:2px}
+.myask{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:6px 0;padding:8px 10px;border:1.5px solid #e2b4a8;background:#fff5f2;border-radius:10px;font-size:14px;color:#7a2a16;font-weight:700;width:100%;box-sizing:border-box}
+.myask-b{display:inline-flex;gap:6px;flex-wrap:wrap}
+.btn.mydelok{background:#b23b1e;color:#fff;border-color:#b23b1e}
+.mymeta{font-size:12px;color:var(--mute);margin-top:2px;flex-basis:100%}
+.mycard .twmain{flex-wrap:wrap}
+.mysents{border-top:1px dashed var(--line);margin:4px 8px 0;padding:4px 0 2px}
+.mysh{font-size:12px;font-weight:700;color:var(--teal);margin:2px 0 2px 4px}
+.srow.mysrow{grid-template-columns:1.6em minmax(0,1fr) auto;padding:4px 6px}
+.mysrow .tnum{font-size:13px;color:var(--mute);text-align:center;padding-top:6px}
+.mysrow .stext .ja{font-size:16px}
+.mysmeta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:var(--mute);margin:2px 0 2px 2px}
+.mysfrom{font-weight:700;color:#5b6b52}
+.mysgo,.mysrm{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:2px 7px;cursor:pointer;color:var(--teal)}
+.mysrm{color:#b23b1e;border-color:#ecc8bd}
+.mytools{display:flex;flex-wrap:wrap;gap:6px 10px;margin:0 0 10px}
+.myseg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;max-width:100%}
+.myseg button{font:inherit;font-size:13px;border:0;background:transparent;padding:6px 10px;cursor:pointer;color:var(--ink,#1f2a1f);border-right:1px solid var(--line)}
+.myseg button:last-child{border-right:0}
+.myseg button.on{background:var(--teal);color:#fff;font-weight:700}
+.mypq{padding:12px}
+.mypq-h{margin-bottom:4px}
+.mypq .mylist{margin-top:8px}
+.mypq-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mypq-btns .mydel{margin-left:auto}
+.mynos{margin:6px 10px}
+@media (max-width:560px){ .mypq-btns .mydel{margin-left:0} .myseg button{padding:6px 8px} }
+.srow.mysrow .tnum{grid-column:1;grid-row:1}
+.srow.mysrow .mysmain{grid-column:2;grid-row:1;min-width:0}
+.srow.mysrow .sbtns{grid-column:3;grid-row:1;justify-self:end;padding-top:0}
+.srow.mysrow .srcbox{grid-column:1/-1}
+.mycard > .myask{margin:6px 10px;width:auto}

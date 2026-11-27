@@ -154,8 +154,41 @@
   }
 
   /* ---- 我的單語 ---- */
-  const MINE_FIELDS = ['ja', 'kana', 'zh', 'note', 'pos', 't'];
-  function mergeMine(a, b) { return mergeMaps(a || {}, b || {}, 'mine'); }
+  const MINE_FIELDS = ['ja', 'kana', 'zh', 'note', 'pos', 't', 'ref'];
+  /* v3.45：src＝這個字是從哪些句子加入的 { [句子key]: {t 加入時間, u 更新時間, on 1/0} }。
+     on:0 是「只移除這一句」的 tombstone；兩台裝置以句子 key 合併、較新者勝（不會因為字本身較新就丟掉另一台加的句子）。 */
+  function cleanSrc(src) {
+    if (!src || typeof src !== 'object') return null;
+    const out = {};
+    Object.keys(src).forEach(k => { const v = src[k]; if (!v || typeof v !== 'object') return;
+      out[k] = { t: +v.t || 0, u: +v.u || +v.t || 0, on: v.on === 0 || v.on === false ? 0 : 1 }; });
+    return Object.keys(out).length ? out : null;
+  }
+  function mergeSrc(a, b) {
+    a = cleanSrc(a) || {}; b = cleanSrc(b) || {};
+    const out = {};
+    new Set([].concat(Object.keys(a), Object.keys(b))).forEach(k => {
+      const x = a[k], y = b[k];
+      if (!x) { out[k] = y; return; } if (!y) { out[k] = x; return; }
+      if (x.u !== y.u) { out[k] = x.u > y.u ? x : y; return; }
+      out[k] = x.on ? x : y;
+    });
+    return Object.keys(out).length ? out : null;
+  }
+  function mergeMine(a, b) {
+    a = a || {}; b = b || {};
+    const out = {};
+    new Set([].concat(Object.keys(a), Object.keys(b))).forEach(id => {
+      const x = a[id], y = b[id], w = pickNewer(x, y);
+      if (x && y && !x.deleted && !y.deleted && (x.src || y.src)) {
+        const e = Object.assign({}, w), src = mergeSrc(x.src, y.src);
+        if (src) e.src = src; else delete e.src;
+        e.updatedAt = Math.max(x.updatedAt || 0, y.updatedAt || 0);
+        out[id] = e;
+      } else out[id] = w;
+    });
+    return out;
+  }
   function packMine(store, now) {
     now = now || Date.now();
     const out = {};
@@ -163,6 +196,7 @@
     Object.keys(items).forEach(id => {
       const v = items[id]; if (!v) return;
       const e = {}; MINE_FIELDS.forEach(f => { if (v[f] != null) e[f] = v[f]; });
+      const src = cleanSrc(v.src); if (src) e.src = src;
       e.updatedAt = +v.u || +v.t || now;
       out[id] = e;
     });
@@ -178,6 +212,7 @@
       const v = packed[id]; if (!v) return;
       if (v.deleted) { tomb[id] = v.updatedAt || 0; return; }
       const e = {}; MINE_FIELDS.forEach(f => { if (v[f] != null) e[f] = v[f]; });
+      const src = cleanSrc(v.src); if (src) e.src = src;
       e.u = v.updatedAt || 0;
       items[id] = e;
     });
@@ -186,7 +221,7 @@
   }
   function mineSig(store) {
     const it = (store && store.items) || {};
-    return Object.keys(it).sort().map(id => id + '@' + (it[id].u || 0)).join('|');
+    return Object.keys(it).sort().map(id => id + '@' + (it[id].u || 0) + (it[id].src ? '~' + Object.keys(it[id].src).sort().map(k => k + '=' + it[id].src[k].on + '.' + it[id].src[k].u).join(',') : '')).join('|');
   }
 
   /* ---- 🏷 時間註記 ---- */
@@ -284,5 +319,5 @@
     return merge(packLocal(S, now), merged);
   }
 
-  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer, visibleSig, rebase, packMine, applyMine, mergeMine, mineSig, packMarks, applyMarks, mergeMarks, marksSig };
+  return { KINDS, emptyPacked, ensureMeta, tomb, tombAll, packLocal, merge, applyToLocal, mergeInto, pickNewer, visibleSig, rebase, packMine, applyMine, mergeMine, mineSig, mergeSrc, packMarks, applyMarks, mergeMarks, marksSig };
 });
