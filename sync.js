@@ -136,13 +136,17 @@
       syncedAt: Date.now()
     };
     if (packed.mine && Object.keys(packed.mine).length) doc.mine = packed.mine;   // 我的單語（v3.39）
+    if (packed.marks && Object.keys(packed.marks).length) doc.marks = packed.marks;   // 🏷 時間註記（v3.42）
     return doc;
   }
   // 我的單語：app.js 提供 window.NhMine = { store(), save(quiet), refresh() }
   function mineApi() { return root.NhMine && root.SyncMerge && root.SyncMerge.packMine ? root.NhMine : null; }
+  // 🏷 時間註記：app.js 提供 window.NhMarks = { store(), save(quiet) }
+  function marksApi() { return root.NhMarks && root.SyncMerge && root.SyncMerge.packMarks ? root.NhMarks : null; }
   function packAll(S) {
     const p = root.SyncMerge.packLocal(S);
     const M = mineApi(); if (M) p.mine = root.SyncMerge.packMine(M.store());
+    const K = marksApi(); if (K) p.marks = root.SyncMerge.packMarks(K.store());
     return p;
   }
 
@@ -175,11 +179,15 @@
         const finalState = changedDuring ? root.SyncMerge.rebase(S, merged) : merged;
         const M = mineApi();
         if (M && changedDuring) finalState.mine = root.SyncMerge.mergeMine(root.SyncMerge.packMine(M.store()), merged.mine);
-        const before = root.SyncMerge.visibleSig(S) + '#' + (M ? root.SyncMerge.mineSig(M.store()) : '');
+        const K = marksApi();
+        if (K && changedDuring) finalState.marks = root.SyncMerge.mergeMarks(root.SyncMerge.packMarks(K.store()), merged.marks);
+        const sigK = () => (K ? '#' + root.SyncMerge.marksSig(K.store()) : '');
+        const before = root.SyncMerge.visibleSig(S) + '#' + (M ? root.SyncMerge.mineSig(M.store()) : '') + sigK();
         root.SyncMerge.applyToLocal(S, finalState);
         if (M && finalState.mine) { root.SyncMerge.applyMine(M.store(), finalState.mine); M.save(true); }
+        if (K && finalState.marks) { root.SyncMerge.applyMarks(K.store(), finalState.marks); K.save(true); }
         appSave(true);
-        const after = root.SyncMerge.visibleSig(S) + '#' + (M ? root.SyncMerge.mineSig(M.store()) : '');
+        const after = root.SyncMerge.visibleSig(S) + '#' + (M ? root.SyncMerge.mineSig(M.store()) : '') + sigK();
         // Only re-render when the cloud actually brought something new; keeps revealed text and open 出處 panels.
         if (before !== after && root.NhApp && typeof root.NhApp.refreshView === 'function') root.NhApp.refreshView();
         else if (root.NhApp && typeof root.NhApp.updateChips === 'function') root.NhApp.updateChips();

@@ -187,6 +187,130 @@ function myAudioIds(){
   return out;
 }
 window.NhMine = { store: () => MY, save: quiet => { mySave(quiet); myRegister(); } };
+
+/* ---------------- 🏷 時間註記（v3.42，參考印尼語 App v54） ----------------
+   在本文／文型／實用會話／單語／單語例句的句子上按 🏷 就記下「日期＋時間」；同一課可以記很多個，不會自動記。
+   存在獨立的 localStorage key nhStudy.marks（不寫入 bunkaListen.v2）：
+     { items:{ [句子key d.id:i]:{l 課, t 註記時間, u 更新時間} }, tomb:{ [句子key]: 刪除時間 } }
+   同步：sync.js 放在雲端 users/{uid}.marks，以句子 key 合併、較新者勝、刪除用 tombstone（sync-merge.js packMarks/applyMarks）。
+   範圍＝一課（像印尼語 App 的「一支影片」）：課頁上方列出本課所有註記（依課內順序）＋「從最新的繼續」。
+   先聽再看：清單只顯示位置與時間，按「看句子」才顯示日文（附假名）。 */
+const BM_KEY = 'nhStudy.marks';
+const BM = (() => { try{ const o = JSON.parse(localStorage.getItem(BM_KEY)||'{}') || {};
+  return {items: (o.items && typeof o.items==='object') ? o.items : {}, tomb: (o.tomb && typeof o.tomb==='object') ? o.tomb : {}}; }catch(e){ return {items:{}, tomb:{}}; } })();
+function bmSave(quiet){ try{ localStorage.setItem(BM_KEY, JSON.stringify(BM)); }catch(e){ toast('儲存失敗（裝置空間不足？）'); } if(!quiet && window.NhSync) window.NhSync.notifyLocalChange(); }
+window.NhMarks = { store: () => BM, save: quiet => bmSave(quiet) };
+const bmRev = {};   // 清單裡「看句子」展開的 key（只在這次畫面有效）
+let bmAsk = null;   // 目前打開「更新時間／刪除／取消」的句子 key
+let pendingBM = null;
+function bmTime(ts){
+  if(!ts) return '';
+  try{ const p = new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Taipei', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false}).formatToParts(new Date(ts));
+    const g = t => ((p.find(x => x.type===t)||{}).value||''); if(g('month') && g('hour')) return `${+g('month')}/${+g('day')} ${g('hour')}:${g('minute')}`; }catch(e){}
+  const d = new Date(ts), z = n => String(n).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+function bmLine(key){ const j = key.lastIndexOf(':'), d = DLG[key.slice(0, j)], i = +key.slice(j+1); return (d && d.lines && d.lines[i]) ? {d, i, ln: d.lines[i]} : null; }
+function bmOk(d){ return !!(d && typeof d.l === 'number' && LESSON[d.l] && !d.mine && !d.mix && !d.vf); }
+function bmHref(d){ return d.tango || d.tangoEx ? `#/t/${d.l}` : d.drill ? `#/g/${d.drill}` : `#/d/${d.id}`; }
+function bmOrder(key){
+  const x = bmLine(key); if(!x) return 1e12;
+  const {d, i, ln} = x;
+  if(d.tango) return i*100;                       // 單語：第 i 個字，後面接它的例句
+  if(d.tangoEx){ const T = DLG['t'+d.l], wi = T ? T.lines.findIndex(l => l.no === ln.w) : -1; return (wi>=0 ? wi : 999)*100 + (ln.ex||0); }
+  const fl = (FLOW[d.l]||[]), ord = fl.filter(x => x.drill||isText(x)).concat(fl.filter(x => !x.drill && !isText(x)));
+  return 1e6 + Math.max(0, ord.indexOf(d))*1000 + i;
+}
+function bmLabel(key){
+  const x = bmLine(key); if(!x) return key;
+  const {d, i, ln} = x, no = lineNo(d, i);
+  if(d.tango) return (ln.kind==='expr' ? 'いろいろな表現 ' : '單語 ') + (no.lab||'');
+  if(d.tangoEx) return '單語例句 ' + (no.lab||'');
+  if(d.drill) return `文型 ${d.drill}・${no.lab}`;
+  if(isText(d)) return `${d.src.label||'本文'}・${no.lab}`;
+  const prac = (FLOW[d.l]||[]).filter(x => !x.drill && !isText(x)), pi = prac.indexOf(d);
+  return `實用會話${pi>=0 ? ' '+(pi+1) : ''}・${no.lab}`;
+}
+function bmList(n){ return Object.keys(BM.items).filter(k => { const it = BM.items[k], x = bmLine(k); return it && it.l === n && x && bmOk(x.d); }).sort((a, b) => bmOrder(a) - bmOrder(b)); }
+function bmLatest(n){ let best = null; bmList(n).forEach(k => { if(!best || (BM.items[k].t||0) > (BM.items[best].t||0)) best = k; }); return best; }
+function bmLatestAll(){ let best = null; Object.keys(BM.items).forEach(k => { const it = BM.items[k], x = bmLine(k); if(!it || !x || !bmOk(x.d) || it.l !== x.d.l) return; if(!best || (it.t||0) > (BM.items[best].t||0)) best = k; }); return best; }
+function bmSet(d, i){
+  const key = d.id+':'+i, old = BM.items[key]; let now = Date.now();
+  if(old && now <= (old.u||0)) now = (old.u||0) + 1;
+  BM.items[key] = {l: d.l, t: now, u: now}; delete BM.tomb[key]; bmSave();
+  return !!old;
+}
+function bmDel(key){ let now = Date.now(); const old = BM.items[key]; if(old && now <= (old.u||0)) now = (old.u||0) + 1; delete BM.items[key]; BM.tomb[key] = now; bmSave(); }
+function bmBtn(d, i){
+  if(!bmOk(d) || !d.lines[i] || d.lines[i].scene) return '';
+  const key = d.id+':'+i, it = BM.items[key], tm = it ? bmTime(it.t) : '';
+  const lab = it ? `時間註記 ${tm}（按一下可更新時間或刪除）` : '加上時間註記（記下現在的日期時間）';
+  return `<button type="button" class="ibtn s bmbtn${it?' on':''}" data-act="bm" data-d="${d.id}" data-i="${i}" aria-pressed="${it?'true':'false'}" aria-label="${lab}" title="${lab}">🏷${it?`<span class="bmt">${tm}</span>`:''}</button>`;
+}
+function bmRevHTML(key){
+  const x = bmLine(key); if(!x || !bmRev[key]) return '';
+  const {ln} = x, ja = ln.ja || '', kana = ln.kana || '';
+  return `<div class="bmrev"><div class="ja">${esc(ja)}</div>${kana && kana !== ja ? `<div class="kana">${esc(kana)}</div>` : ''}${ln.zh ? `<div class="zh">${esc(ln.zh)}</div>` : ''}</div>`;
+}
+function bmBarHTML(n, compact){
+  if(!LESSON[n]) return '';
+  const ks = bmList(n), lt = bmLatest(n);
+  if(!ks.length) return compact ? `<div class="bmbar empty" data-bm-bar="${n}" data-bm-compact="1"></div>` : `<div class="bmbar empty" data-bm-bar="${n}"><span class="small mute">🏷 時間註記：在本文、文型、單語的句子按 🏷，就會記下日期時間，可以記很多個，方便下次從那裡繼續。</span></div>`;
+  return `<div class="bmbar" data-bm-bar="${n}"${compact?' data-bm-compact="1"':''}>
+    <div class="bmnow"><span class="small">🏷 本課 <b>${ks.length}</b> 個時間註記・最新：<b>${esc(bmLabel(lt))}</b>・${esc(bmTime(BM.items[lt].t))}</span>
+      <button type="button" class="btn sm" data-act="bmgo" data-k="${esc(lt)}">從最新的繼續</button></div>
+    <details class="bmdet"${!compact && ks.length<=4?' open':''}><summary class="small">全部註記（依課內順序，${ks.length}）</summary>
+    <ul class="bmul">${ks.map(k => { const x = bmLine(k);
+      return `<li class="bmli${k===lt?' latest':''}"><div class="bmrow"><span class="bmlab small">${esc(bmLabel(k))}<span class="mute">・${esc(bmTime(BM.items[k].t))}</span></span>
+        <span class="bmacts"><button type="button" class="ibtn s" data-act="play" data-d="${x.d.id}" data-i="${x.i}" aria-label="播放這句" title="播放">🔊</button><button type="button" class="btn sm ghost" data-act="bmrv" data-k="${esc(k)}">${bmRev[k]?'隱藏':'看句子'}</button><button type="button" class="btn sm ghost" data-act="bmgo" data-k="${esc(k)}">跳過去</button></span></div>${bmRevHTML(k)}</li>`; }).join('')}</ul></details>
+  </div>`;
+}
+function bmLessonLine(n){
+  const ks = bmList(n); if(!ks.length) return '';
+  const lt = bmLatest(n);
+  return `<div class="small bmcard">🏷 ${ks.length} 個註記・最新 ${esc(bmLabel(lt))}・${esc(bmTime(BM.items[lt].t))}</div>`;
+}
+function bmHomeHTML(){
+  const k = bmLatestAll(); if(!k) return '';
+  const x = bmLine(k), n = x.d.l, L = LESSON[n];
+  return `<div class="card bmhome"><div class="small">🏷 最新的時間註記：<b>${lessonLabel(n)}</b> ${esc(L.t)}<span class="mute">（${esc(L.r||'')}）</span>・${esc(bmLabel(k))}・${esc(bmTime(BM.items[k].t))}・本課共 ${bmList(n).length} 個</div>
+    <div class="row" style="margin-top:6px"><button type="button" class="btn sm" data-act="bmgo" data-k="${esc(k)}">從最新的繼續</button><a class="btn sm ghost" style="text-decoration:none" href="#/l/${n}">看本課全部註記</a></div></div>`;
+}
+function bmRefreshBars(){ document.querySelectorAll('[data-bm-bar]').forEach(el => { const t = document.createElement('div'); t.innerHTML = bmBarHTML(+el.dataset.bmBar, !!el.dataset.bmCompact); const nn = t.firstElementChild; if(nn){ const det = el.querySelector('details.bmdet'); const nd = nn.querySelector('details.bmdet'); if(det && nd) nd.open = det.open; el.replaceWith(nn); } }); }
+function bmCloseAsk(){ document.querySelectorAll('.bmask').forEach(e => e.remove()); bmAsk = null; }
+function bmOpenAsk(d, i){
+  const key = d.id+':'+i; bmCloseAsk();
+  let anchor = document.querySelector(`.line[data-key="${key}"]`); if(!anchor) return;
+  const sb = anchor.nextElementSibling; if(sb && sb.classList.contains('srcbox')) anchor = sb;
+  const it = BM.items[key]; if(!it) return;
+  const el = document.createElement('div'); el.className = 'bmask'; el.dataset.for = key;
+  el.innerHTML = `<span class="small">🏷 這句已註記・${esc(bmTime(it.t))}</span><span class="bmacts"><button type="button" class="btn sm" data-act="bmupd" data-k="${esc(key)}">更新時間</button><button type="button" class="btn sm ghost bmdel" data-act="bmdel" data-k="${esc(key)}">刪除</button><button type="button" class="btn sm ghost" data-act="bmcancel">取消</button></span>`;
+  anchor.after(el); bmAsk = key;
+  const r = el.getBoundingClientRect(); if(r.bottom > innerHeight) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+function bmRedraw(key){ const x = bmLine(key); if(x) rerenderLine(x.d, x.i, current&&current.type==='review'?{review:true,showId:true}:{}); bmRefreshBars(); }
+function bmAct(act, b){
+  if(act==='bm'){ const d = DLG[b.dataset.d], i = +b.dataset.i, key = d.id+':'+i;
+    if(BM.items[key]){ if(bmAsk === key){ bmCloseAsk(); return; } bmOpenAsk(d, i); return; }
+    bmCloseAsk(); bmSet(d, i); bmRedraw(key); toast('🏷 已加上時間註記・' + bmTime(BM.items[key].t)); }
+  else if(act==='bmupd'){ const key = b.dataset.k, x = bmLine(key); bmCloseAsk(); if(!x) return; bmSet(x.d, x.i); bmRedraw(key); toast('🏷 時間已更新・' + bmTime(BM.items[key].t)); }
+  else if(act==='bmdel'){ const key = b.dataset.k; bmCloseAsk(); bmDel(key); bmRedraw(key); toast('🏷 已刪除這個註記'); }
+  else if(act==='bmcancel') bmCloseAsk();
+  else if(act==='bmrv'){ const k = b.dataset.k; if(bmRev[k]) delete bmRev[k]; else bmRev[k] = 1; bmRefreshBars(); }
+  else if(act==='bmgo') bmGo(b.dataset.k);
+}
+function bmGo(key){
+  const x = bmLine(key); if(!x) return;
+  const h = bmHref(x.d);
+  if(location.hash === h){ bmScroll(key); return; }
+  pendingBM = key; location.hash = h;
+}
+// 跳到那一句：只捲動＋閃一下，不自動顯示文字（先聽再看）；收合中的例句會先展開
+function bmScroll(key){
+  const el = document.querySelector(`.line[data-key="${key}"]`); if(!el){ toast('找不到這一句（可能被篩選隱藏）'); return; }
+  const dt = el.closest('details'); if(dt && !dt.open){ dt.open = true; const c = el.closest('.tcard'); if(c) syncTexChev(c); if(document.querySelector('.tlist')) syncTexAllBtn(); }
+  el.scrollIntoView({block:'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200);
+}
+function applyBM(){ const k = pendingBM; pendingBM = null; if(k) bmScroll(k); }
 function myRowHTML(d){
   const id = d.myId, it = MY.items[id] || {}, ln = d.lines[0], key = d.id+':0', lv = (reveal[key]||0);
   const kanaLine = ln.kana && ln.kana !== ln.ja ? `<div class="kana">${esc(ln.kana)}</div>` : '';
@@ -643,12 +767,13 @@ function viewHome(){
     <a class="btn alt" href="#/review" style="text-decoration:none">📝 複習清單（${revCount()}）</a>
     <span class="small mute">已完成對話 ${doneD}/${totalD}</span>
   </div>
+  ${bmHomeHTML()}
   <a class="card mxhome myhome" href="#/mine"><div class="mxhome-ic">⭐</div><div><div class="ltitle">我的單語</div><div class="small mute">${myList().length ? `已有 ${myList().length} 個自己加的字・` : ''}自己輸入課本以外的新字（日文、假名、中文），先聽再看；只存在你的裝置與你的同步帳號。</div></div></a>
   ${MIX.length?`<a class="card mxhome" href="#/mix"><div class="mxhome-ic">🎧</div><div><div class="ltitle">綜合聽力測驗</div><div class="small mute">自己選課（單選、複選、連選），用這幾課的單語、本文、文型組成新句子，先聽再看；下拉看用到的單語、文型與動詞・形容詞變化。</div></div><span class="mxhome-go">›</span></a>`:''}
   <div class="small" style="margin:-6px 0 12px"><a href="#/p/b/0" style="color:inherit">📚 翻閱整本課本（全部 272 頁・含第13–18課與附錄）›</a></div>
   <div class="grid">${B.lessons.map(l => { const p = lessonProgress(l.n); const q = B.dialogues.filter(d=>d.l===l.n).map(d=>S.quiz[d.id]).filter(x=>x!=null);
     return `<a class="card" href="#/l/${l.n}"><div class="lnum">${lessonLabel(l.n)} ${UNCERTAIN[l.n]?'<span class="badge u">部分推定</span>':''}</div><div class="ltitle">${esc(l.t)}</div><div class="small mute">${esc(l.zh)}</div><div class="small mute">${esc(l.topic)}</div>
-    <div class="bar"><i style="width:${p.pct}%"></i></div><div class="small mute" style="margin-top:4px">${p.done}/${p.total} 對話${q.length?`・測驗最佳 ${Math.max(...q)}%`:''}</div></a>`; }).join('')}</div>
+    <div class="bar"><i style="width:${p.pct}%"></i></div><div class="small mute" style="margin-top:4px">${p.done}/${p.total} 對話${q.length?`・測驗最佳 ${Math.max(...q)}%`:''}</div>${bmLessonLine(l.n)}</a>`; }).join('')}</div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('home') : ''}
   <h2>📱 加到主畫面（離線也能複習）</h2>
   <div class="card small">
@@ -712,6 +837,7 @@ function viewTango(n){
   </div>
   <div class="small nowp" id="nowPlaying"></div>
   </div>
+  ${bmBarHTML(n, true)}
   <div class="tlist timg-${tangoImgSize}" data-blk>
     <div class="blkbar">${blkBtn(false)}<button class="btn sm ghost" data-act="texall">展開全部例句</button></div>
     <h2 class="th2">単語　たんご</h2>
@@ -812,7 +938,7 @@ function tangoExRowHTML(d, i){
   return `<div class="line srow trow exrow${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tnum">${esc(circ[ln.ex]||String(ln.ex||((i%3)+1)))}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${bmBtn(d, i)}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function tangoExBlockHTML(n, wordNo){
@@ -889,7 +1015,7 @@ function tangoRowHTML(d, i){
   return `<div class="line srow trow twd${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}
     <div class="tleft"><div class="tnum">${esc(ln.lab||String(i+1))}</div>${imgBtn}</div>
     <div class="twmain"><div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>${chev}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${bmBtn(d, i)}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>${imgBox}`;
 }
 function toggleTangoPage(n, pg){
@@ -928,6 +1054,7 @@ function viewLesson(n){
   </div>
   <div class="small nowp" id="nowPlaying"></div>
   </div>
+  ${bmBarHTML(n)}
   ${B.tango && B.tango[n] ? tangoLessonCard(n) : ''}
   <h2>📖 課本內容（依課本頁序${n?'：本文＋文型':''}）</h2>
   <div class="dlist">${FLOW[n].filter(d=>d.drill||isText(d)).map(fCard).join('')}</div>
@@ -994,7 +1121,7 @@ function drillRowHTML(d, i, P){
   const pre = (r.pg ? `<div class="spg">p.${r.pg}</div>` : '') + (r.head ? `<div class="shead">${esc(r.head)}</div>` : '');
   return pre + `<div class="line srow drow k-${r.kind}${r.left?' first':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key)}<div class="snum">${esc(r.left)}</div>
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${blkOf(d, i) ? `<button class="ibtn s blkbtn${document.querySelector(`.blkinl[data-for="${key}"]`)?' on':''}" aria-expanded="${!!document.querySelector(`.blkinl[data-for="${key}"]`)}" data-act="blkpg" data-d="${d.id}" data-i="${i}" aria-label="看課本上這一句（截圖）" title="課本上這一句">📖</button>` : ''}</div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button><button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button><button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${blkOf(d, i) ? `<button class="ibtn s blkbtn${document.querySelector(`.blkinl[data-for="${key}"]`)?' on':''}" aria-expanded="${!!document.querySelector(`.blkinl[data-for="${key}"]`)}" data-act="blkpg" data-d="${d.id}" data-i="${i}" aria-label="看課本上這一句（截圖）" title="課本上這一句">📖</button>` : ''}${bmBtn(d, i)}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function viewDrill(k){
@@ -1007,6 +1134,7 @@ function viewDrill(k){
   <div class="small"><span class="badge txt">同文型聽力練習・課本例句（${d.lines.length} 句，皆標頁碼）</span></div>
   <div class="hrow"><h1>🎧 ${gPatHTML(k, gLabel(k))}</h1>${bookBtnHTML(d, !!(window.BLK||{})[k])}</div>
   <div class="scene">💡 ${esc(g.zh)}</div>
+  ${n ? bmBarHTML(n, true) : ''}
   ${playerHTML()}
   <div class="script dscript" id="lines" data-blk><div class="dtitle"><span class="dbadge">${n?'文型 '+esc(k.split('-')[1]):'入門'}</span> <span class="small mute">p.${g.pg}</span>${blkBtn(false)}</div>${(P => d.lines.map((_,i)=>drillRowHTML(d,i,P)).join(''))(drillParse(d))}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）${(window.BLK||{})[k]?'　📖 課本上這一句（截圖）':''}</div>
@@ -1284,7 +1412,7 @@ function rowHTML(d, i){
   const body = (ln.scene ? '<span class="stag">場景</span>' : '') + (lv>=1 ? `<div class="ja">${esc(ln.ja)}</div>${S.showKana?`<div class="kana">${esc(ln.kana)}</div>`:''}${lv>=2?`<div class="zh">${esc(ln.zh)}</div>`:''}` : maskHTML(ln.ja));
   return `<div class="line srow${ln.scene?' sscene':''}${narr?' snarr':''}${S.unf[key]?' unf':''}" data-key="${key}">${ufHTML(key, ln.scene)}${name}
     <div class="stext${lv?'':' masked'}" data-act="rv" data-k="${key}" role="button" tabindex="0" aria-label="${lv>=2?'再點一次隱藏':lv?'顯示中文':'顯示日文'}">${body}</div>
-    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button>${ln.scene?'':`<button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button>`}<button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button></div>
+    <div class="sbtns"><button class="ibtn s" data-act="play" data-d="${d.id}" data-i="${i}" aria-label="播放" title="播放">🔊</button>${ln.scene?'':`<button class="ibtn s" data-act="rep" data-d="${d.id}" data-i="${i}" aria-label="重複三次" title="重複三次">🔁</button>`}<button class="ibtn s" data-act="idk" data-d="${d.id}" data-i="${i}" aria-label="我不會（顯示出處並加入複習）" title="我不會">🙋</button>${bmBtn(d, i)}</div>
   </div><div class="srcbox sx" id="src-${key.replace(':','_')}" data-for="${key}"></div>`;
 }
 function illList(d){ return (window.ILL||{})[d.id] || []; }
@@ -1325,6 +1453,7 @@ function viewDialogue(id){
   <div class="small"><span class="badge ${d.src?'txt':''}">${esc(srcTag(d))}</span></div>
   <div class="hrow"><h1>${esc(d.title)}</h1>${bookBtnHTML(d)}</div>
   <div class="scene">🎬 ${esc(d.scene)}</div>
+  ${bmBarHTML(d.l, true)}
   ${playerHTML()}
   <div class="script${isNarr(d)?' narr':''}${illHTML(d)?' has-ill':''}" id="lines" data-blk><div class="blkbar">${rpOK(d, d.lines.map((_, i) => i)) ? rpBtn(d.id) : ''}${blkBtn(false)}</div>${illHTML(d)}${scriptRowsHTML(d)}</div>
   <div class="small mute" style="margin-top:6px">點文字：第 1 次顯示日文、第 2 次顯示中文、第 3 次再隱藏。🔊 播放　🔁 重複三次　🙋 我不會（看出處、加入複習）</div>
@@ -1867,6 +1996,7 @@ document.addEventListener('click', e => {
   const act = b.dataset.act;
   if(/^mx/.test(act) && act!=='mx'){ mixAct(act, b, e); return; }
   if(/^my(add|edit|cancel|del|tts|export)$/.test(act)){ e.preventDefault(); myAct(act, b); return; }
+  if(/^bm(|upd|del|cancel|rv|go)$/.test(act)){ e.preventDefault(); e.stopPropagation(); bmAct(act, b); return; }
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
   else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(k.split(':')[0]); }
   else if(act==='vfshow'){ const j = b.dataset.j; vfSetAll(j, !DLG[j].lines.every((_, k) => vfReveal[j+':'+k])); }
@@ -1995,7 +2125,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 3.41（第18課單語插圖 61 張）</div>
+  <div class="foot">版本 3.42（新增 🏷 時間註記：句子按 🏷 記下日期時間，一課可記多個，課頁列出全部並可「從最新的繼續」，會同步到自己的帳號）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -2140,6 +2270,7 @@ function route(){
   renderRoute();
   updateChips(); window.scrollTo(0,0);
   if(pendingHL) setTimeout(applyHL, 60);
+  if(pendingBM) setTimeout(applyBM, 80);
 }
 /* 雲端合併後立刻重畫目前頁面與側欄（不關掉設定、不把捲動跳回頂端；播放中只更新計數以免中斷）。 */
 let keepReveal = false; // refreshView re-renders the same page: keep what the user revealed

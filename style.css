@@ -972,3 +972,25 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
   .myf-grid{grid-template-columns:1fr}
   .btn.mydel{margin-left:0}
 }
+/* 🏷 時間註記（v3.42） */
+.ibtn.s.bmbtn{color:#8a6a1f;filter:grayscale(.6);opacity:.75}
+.ibtn.s.bmbtn.on{filter:none;opacity:1;width:auto;min-width:30px;padding:0 6px;gap:3px;display:inline-flex;align-items:center;border-radius:14px;background:#fff7e3;border-color:#e6c77a;font-size:13px}
+.bmbtn .bmt{font-size:11px;color:#7a5a12;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bmask{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:4px 0 8px;padding:8px 10px;border:1px solid #e6c77a;background:#fffaf0;border-radius:10px}
+.bmask .bmacts,.bmbar .bmacts{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bmask .bmdel{color:var(--alert);border-color:#e7b4b2}
+.bmbar{margin:8px 0 12px;padding:8px 10px;border:1px solid #eadcb4;background:#fffcf4;border-radius:10px}
+.bmbar.empty{background:transparent;border-style:dashed;border-color:var(--line)}
+.bmbar.empty[data-bm-compact]{display:none}
+.bmnow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.bmdet{margin-top:6px}
+.bmdet summary{cursor:pointer;color:var(--mute)}
+.bmul{list-style:none;margin:6px 0 0;padding:0}
+.bmli{border-top:1px solid #f0e6cc;padding:5px 0}
+.bmli.latest .bmlab{font-weight:700}
+.bmrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px}
+.bmlab{min-width:0;overflow-wrap:anywhere}
+.bmrev{margin:4px 0 2px 4px;padding-left:8px;border-left:3px solid #e6c77a}
+.bmrev .ja{font-size:15px}.bmrev .kana{font-size:12px;color:var(--mute)}.bmrev .zh{font-size:13px}
+.bmhome{margin:0 0 12px;border-color:#eadcb4;background:#fffcf4}
+.bmcard{margin-top:3px;color:#7a5a12}
