@@ -2,10 +2,24 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
-const APP_VER = '3.51';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
+const APP_VER = '3.52';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
+/* v3.52 語速：0.7 用預錄 _s；0.85 用 1X 檔＋playbackRate（音高不變）；1 用 1X 檔。選擇記在既有的 S.speed（bunkaListen.v2，不改 key）。 */
+const SPEEDS = [0.7, 0.85, 1];
+const spdEq = (a, b) => Math.abs((+a) - (+b)) < 0.001;
+const spdSlow = () => spdEq(S.speed, 0.7);
+const spdRate = () => spdEq(S.speed, 0.85) ? 0.85 : 1;
+function spdLabel(sp, chip){ if(spdEq(sp, 1)) return chip ? '1.0x' : '1x'; if(spdEq(sp, 0.85)) return '0.85x'; return '0.7x'; }
+function speedSegHTML(kind){
+  const attr = kind==='qs' ? 'data-qs' : 'data-act="spd" data-sp';
+  return `<div class="seg" role="group" aria-label="速度">${SPEEDS.map(sp => `<button ${attr}="${sp}" class="${spdEq(S.speed, sp)?'on':''}">${spdLabel(sp)}</button>`).join('')}</div>`;
+}
+function syncSpeedUI(){
+  document.querySelectorAll('[data-sp],[data-qs]').forEach(x => x.classList.toggle('on', spdEq(x.dataset.sp||x.dataset.qs, S.speed)));
+  const b = document.getElementById('speedBtn'); if(b){ b.textContent = spdLabel(S.speed, true); b.classList.toggle('on', !spdEq(S.speed, 1)); }
+}
 function safeParse(t){ try{ return JSON.parse(t)||{}; }catch(e){ return {}; } }
 // 聽力優先 is always the default. 顯示全文 is now a per-block toggle (blkBtn) that only lasts for the page you are on and is never stored.
 // (Older versions saved listenFirst:false in localStorage, which made every page open with the text shown.)
@@ -800,19 +814,24 @@ function speakTTS(text, token){
     if(!('speechSynthesis' in window)){ toast('此裝置不支援語音'); return res(); }
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP'; if(jaVoice) u.voice = jaVoice; u.rate = S.speed < 1 ? 0.7 : 0.95;
+    u.lang = 'ja-JP'; if(jaVoice) u.voice = jaVoice; u.rate = spdEq(S.speed, 0.7) ? 0.7 : spdEq(S.speed, 0.85) ? 0.85 : 0.95;
     let done = false; const fin = () => { if(!done){ done = true; res(); } };
     u.onend = fin; u.onerror = fin;
     speechSynthesis.speak(u);
     // safety: some Android builds never fire onend
-    setTimeout(fin, 1500 + text.length * 450 / (S.speed<1?0.7:1));
+    setTimeout(fin, 1500 + text.length * 450 / (spdEq(S.speed, 0.7) ? 0.7 : spdEq(S.speed, 0.85) ? 0.85 : 1));
   });
 }
 function playMP3(src, token){
   return new Promise((res, rej) => {
     audio.onended = () => res();
     audio.onerror = () => rej(new Error('audio error'));
-    audio.src = src; audio.playbackRate = 1;
+    const rate = spdRate();
+    audio.preservesPitch = true;
+    if('webkitPreservesPitch' in audio) audio.webkitPreservesPitch = true;
+    if('mozPreservesPitch' in audio) audio.mozPreservesPitch = true;
+    audio.onloadedmetadata = () => { audio.playbackRate = rate; audio.defaultPlaybackRate = rate; };
+    audio.src = src; audio.playbackRate = rate; audio.defaultPlaybackRate = rate;
     const p = audio.play();
     if(p && p.catch) p.catch(rej);
   });
@@ -822,7 +841,7 @@ async function playLine(d, i, token){
   const key = d.id + ':' + i; setPlaying(key);
   const ln = d.lines[i];
   if(S.engine === 'mp3' && !d.tts){
-    try{ await playMP3(`${ln.au || `audio/${d.id}_${i}`}${S.speed<1?'_s':''}.mp3`, token); }
+    try{ await playMP3(`${ln.au || `audio/${d.id}_${i}`}${spdSlow()?'_s':''}.mp3`, token); }
     catch(e){ if(token !== playToken) return false; toast('MP3 載入失敗，改用裝置語音'); await speakTTS(ln.say||ln.ja, token); }
   } else { await speakTTS(ln.say||ln.ja, token); }
   if(token !== playToken) return false;
@@ -894,7 +913,6 @@ function drillTextHTML(d, i, lv){
   if(ln.x && ln.x.length) h += `<div class="small mute">補充單字：${ln.x.map(e=>esc(e.w+'（'+e.r+'）＝'+e.zh)).join('、')}</div>`;
   return h + `<button class="btn sm ghost" data-act="drv">隱藏</button>`;
 }
-function speedSegHTML(){ return `<div class="seg" role="group" aria-label="速度"><button data-act="spd" data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-act="spd" data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>`; }
 function drillsHTML(keys, skip){
   keys = keys.filter(k => DRILL[k] && k !== skip); if(!keys.length) return '';
   return `<div class="drills"><div style="margin-top:10px"><b>🎧 同文型聽力練習</b> <span class="small mute">課本文型例句（標頁碼），先聽，再點開日文、中文</span></div>` + keys.map((k, n) => { const d = DRILL[k];
@@ -989,8 +1007,7 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.rem
 function updateChips(){
   const n = revCount();
   const rc = $('#reviewCount'); if(rc) rc.textContent = n;
-  $('#speedBtn').textContent = (S.speed<1?'0.7':'1.0') + 'x';
-  $('#speedBtn').classList.toggle('on', S.speed<1);
+  syncSpeedUI();
   document.querySelectorAll('a[href="#/review"]').forEach(a => {
     if(a.id==='reviewChip') return;
     if(/複習清單/.test(a.textContent||'')) a.textContent = `📝 複習清單（${n}）`;
@@ -1638,7 +1655,7 @@ function lineHTML(d, i, opts={}){
 function playerHTML(noMode){
   return `<div class="player"><div class="row">
     <button class="btn" id="playAllBtn">▶ 全部播放</button>
-    <div class="seg" role="group" aria-label="速度"><button data-sp="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-sp="1" class="${S.speed>=1?'on':''}">1x</button></div>
+    ${speedSegHTML()}
   </div></div>`;
 }
 function infoTipHTML(msg){
@@ -1778,7 +1795,7 @@ function bindPlayer(){
     const finished = await playSeq(c.d, c.idxs);
     if(finished && c.type==='dlg'){ S.done[c.d.id] = true; save(); toast('這段聽完了 👍 試試看測驗吧'); }
   };
-  document.querySelectorAll('.player [data-sp]').forEach(b => b.onclick = () => { S.speed = +b.dataset.sp; save(); document.querySelectorAll('.player [data-sp]').forEach(x=>x.classList.toggle('on', x===b)); });
+  document.querySelectorAll('.player [data-sp]').forEach(b => b.onclick = () => { S.speed = +b.dataset.sp; save(); syncSpeedUI(); });
 }
 
 /* review */
@@ -2051,7 +2068,7 @@ function renderQ(){
     <div class="q">${q.type==='hear' ? '🎧 你聽到的是哪一句？' : '🎧 這句話是什麼意思？'}</div>
     <div class="row" style="margin-bottom:10px">
       <button class="btn" id="qPlay">🔊 再聽一次</button>
-      <div class="seg"><button data-qs="0.7" class="${S.speed<1?'on':''}">0.7x</button><button data-qs="1" class="${S.speed>=1?'on':''}">1x</button></div>
+      ${speedSegHTML('qs')}
     </div>
     <div class="opts">${q.options.map((o,k)=>`<button class="opt ${q.type==='hear'?'jp':''}" data-k="${k}">${esc(o)}</button>`).join('')}</div>
     <div class="row" style="margin-top:10px"><button class="btn sm alt" id="qIdk">🙋 我不會</button></div>
@@ -2060,7 +2077,7 @@ function renderQ(){
   const d = q.d;
   const lineObj = {id:d.id};
   $('#qPlay').onclick = () => playLine(d, q.i);
-  document.querySelectorAll('[data-qs]').forEach(b => b.onclick = () => { S.speed = +b.dataset.qs; save(); document.querySelectorAll('[data-qs]').forEach(x=>x.classList.toggle('on', x===b)); playLine(d, q.i); });
+  document.querySelectorAll('[data-qs]').forEach(b => b.onclick = () => { S.speed = +b.dataset.qs; save(); syncSpeedUI(); playLine(d, q.i); });
   document.querySelectorAll('.opt').forEach(b => b.onclick = () => answerQ(q.options[+b.dataset.k], b));
   $('#qIdk').onclick = () => answerQ(null, null);
   setTimeout(()=>playLine(d, q.i), 250);
@@ -2196,7 +2213,7 @@ function rpDraw(){
   const tgt = el.querySelector('.rpcard'); if(tgt) tgt.scrollIntoView({block:'nearest'});
 }
 function rpTick(){ const s = RPS; clearInterval(s.timer); const f = () => { const t = document.getElementById('rpTimer'); if(!t || !RPS || RPS.phase!=='turn'){ clearInterval(s.timer); return; } t.textContent = `⏱ ${Math.floor((Date.now()-s.t0)/1000)} 秒`; }; f(); s.timer = setInterval(f, 1000); }
-function rpSrc(u){ return `${u}${S.speed<1?'_s':''}.mp3`; }
+function rpSrc(u){ return `${u}${spdSlow()?'_s':''}.mp3`; }
 async function rpPlayUrl(base, token){ try{ await playMP3(rpSrc(base), token); return true; }catch(e){ return false; } }
 async function rpRun(){
   const s = RPS; if(!s) return; stopAll(); const token = playToken; const d = s.d;
@@ -2333,7 +2350,7 @@ document.addEventListener('click', e => {
   else if(act==='srcclose'){ closeSrc(b.dataset.k, b.classList.contains('bot')); }
   else if(act==='drv'){ const el = b.closest('.dline'); const lv = (+el.dataset.lv + 1) % 3; el.dataset.lv = lv; el.querySelector('.dtext').innerHTML = drillTextHTML(DLG[el.dataset.d], +el.dataset.i, lv); }
   else if(act==='dall'){ const d = DLG[b.dataset.d]; if(curPlaying && curPlaying.startsWith(d.id+':')){ stopAll(); return; } const idxs = (d.split && d.groups) ? d.groups.flatMap(g=>g.idx) : d.lines.map((_,i)=>i); playSeq(d, idxs); }
-  else if(act==='spd'){ S.speed = +b.dataset.sp; save(); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); }
+  else if(act==='spd'){ S.speed = +b.dataset.sp; save(); syncSpeedUI(); }
   else if(act==='ill'){ openIll(b.dataset.d, +b.dataset.j); }
   else if(act==='bookpg'){ const d = DLG[b.dataset.d]; if(d) openBook(d); }
   else if(act==='blkpg'){ const d = DLG[b.dataset.d]; if(d){ const id = d.id+':'+b.dataset.i; if(innerWidth < SIDE_MIN || b.classList.contains('blkinl-x')) toggleBlkInline(d, +b.dataset.i); else if(PM && PM.mode==='side' && PM.id===id) closePageModal(); else openBlk(d, +b.dataset.i); } }
@@ -2346,7 +2363,7 @@ document.addEventListener('click', e => {
   else if(act==='playhelp'){ e.preventDefault(); toast(b.dataset.tip || b.title || '說明'); }
   else if(act==='got'){ if(window.SyncMerge) SyncMerge.tomb(S,'review',b.dataset.k); delete S.review[b.dataset.k]; save(); toast('太棒了！已從複習清單移除'); viewReview(); }
 });
-$('#speedBtn').onclick = () => { S.speed = S.speed<1 ? 1 : 0.7; save(); toast('播放速度 '+(S.speed<1?'0.7x':'1x')); document.querySelectorAll('[data-sp],[data-qs]').forEach(x=>x.classList.toggle('on', +(x.dataset.sp||x.dataset.qs)===S.speed)); };
+$('#speedBtn').onclick = () => { const i = Math.max(0, SPEEDS.findIndex(sp => spdEq(S.speed, sp))); S.speed = SPEEDS[(i + 1) % SPEEDS.length]; save(); toast('播放速度 ' + spdLabel(S.speed)); syncSpeedUI(); };
 $('#settingsBtn').onclick = openSettings;
 $('#sheet').addEventListener('click', e => { if(e.target.id==='sheet') closeSheet(); });
 document.addEventListener('change', e => {
@@ -2443,7 +2460,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 ${APP_VER}（動詞變化：❓ 怎麼變移到左邊；可能形以後每一種形都有 🗣 造句，先聽再點開看日文、再點一下看中文）</div>
+  <div class="foot">版本 ${APP_VER}（語速可選 0.7／0.85／1；0.85 是把原本的語音放慢、音高不變）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
@@ -2536,7 +2553,7 @@ async function sPlay(n, token){
   const o = SVIEW[n]; if(!o || !o.au) return true;
   if(token === undefined){ stopAll(); token = playToken; }
   sMark(n);
-  if(S.engine === 'mp3'){ try{ await playMP3(`${o.au}${S.speed<1?'_s':''}.mp3`, token); }catch(e){ if(token !== playToken) return false; await speakTTS(o.ja, token); } }
+  if(S.engine === 'mp3'){ try{ await playMP3(`${o.au}${spdSlow()?'_s':''}.mp3`, token); }catch(e){ if(token !== playToken) return false; await speakTTS(o.ja, token); } }
   else await speakTTS(o.ja, token);
   if(token !== playToken) return false; sMark(null); return true; }
 function sAllBtn(){ document.querySelectorAll('[data-sact="all"]').forEach(b => b.textContent = sAllOn ? '⏹ 停止' : '▶ 全部播放'); }
