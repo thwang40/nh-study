@@ -2,7 +2,7 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
-const APP_VER = '3.46';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
+const APP_VER = '3.47';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
@@ -2347,7 +2347,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 ${APP_VER}（我的單語可以依詞性、分類、用途整理，一個字可在好幾組；可只練習一組；✏️ 可自己點選分類和用途）</div>
+  <div class="foot">版本 ${APP_VER}（單語例句和綜合聽力測驗的疑問句〜か？改成句尾上揚，共 477 句；いつ 的聲調也修正）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
