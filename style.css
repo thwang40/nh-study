@@ -1096,3 +1096,17 @@ details.vfrules > summary{cursor:pointer;padding:7px 10px;font-size:13px;font-we
 .vfrr{display:grid;grid-template-columns:6.5em minmax(0,1fr);gap:8px;padding:5px 0;border-top:1px solid #f0ede4;font-size:13px;line-height:1.5}
 .vfrn{font-weight:700;color:#3d5a3a}
 .vfrex{display:block;color:#2f3b2b;font-size:14px}
+
+/* v3.51 ❓ 移到左邊、🗣 造句 */
+.vflab{display:flex;align-items:center;gap:4px}
+.vflab .vfq{flex:none}
+.vflt{min-width:0}
+.vfex{grid-column:1/-1;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;margin:1px 0 0;padding:5px 2px 1px;border-top:1px dashed #ece9df}
+.vfext{font-size:11px;color:#7a8a74;white-space:nowrap}
+.vfexs{cursor:pointer;min-width:0;line-height:1.45;-webkit-user-select:text;user-select:text}
+.vfexs.masked{-webkit-user-select:none;user-select:none}
+.vfexs .mask{margin:4px 0}
+.vfexs .ja{display:block;font-size:15px}
+.vfexs .kana{display:block;font-size:12px;color:#6b7a66}
+.vfexs .zh{display:block;font-size:13px;color:#44503f;margin-top:2px}
+.vfexh{display:block;font-size:11px}
