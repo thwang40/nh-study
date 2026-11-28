@@ -2,7 +2,7 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
-const APP_VER = '3.49';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
+const APP_VER = '3.50';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
@@ -115,7 +115,7 @@ function registerTangoEx(){
 }
 registerTangoEx();
 /* 單語頁動詞變化聽力（v3.36）：BOOK.vf（vforms.js）→ 虛擬對話 vf<j>，音檔 audio/vf<j>_<k>.mp3；只在單語頁用，不進複習／測驗 */
-(B.vf || []).forEach((v, j) => { DLG['vf'+j] = {id:'vf'+j, l:0, vf:true, title:v.w+' 動詞變化', scene:'', sp:{A:{name:'動詞變化', voice:'f'}},
+(B.vf || []).forEach((v, j) => { DLG['vf'+j] = {id:'vf'+j, l:0, vf:true, vg:v.g, vw:v.w, vk:v.f[0][3], vfu:v.f[0][1], title:v.w+' 動詞變化', scene:'', sp:{A:{name:'動詞變化', voice:'f'}},
   lines: v.f.map(f => ({s:'A', ja:f[2], furi:f[1], kana:f[3], zh:f[0], say:f[2], lab:f[0], g:[], v:[]}))}; });
 const VF_GL = {I:'I 類（五段）', II:'II 類（一段）', III:'III 類（不規則）'};
 const vfReveal = {};   // 只存在記憶體，不寫入 bunkaListen.v2
@@ -129,14 +129,31 @@ function vfRowHTML(vid, k){
   const key = vid+':'+k, ln = DLG[vid].lines[k], on = !!vfReveal[key];
   return `<div class="vfrow${curPlaying===key?' playing':''}" data-key="${key}"><span class="vflab">${esc(ln.lab)}</span>
     <span class="vftx${on?'':' masked'}" data-act="vfrv" data-k="${key}" role="button" tabindex="0" aria-label="${on?'隱藏':'顯示日文'}">${vfTextHTML(vid, k)}</span>
-    <button class="ibtn s" data-act="play" data-d="${vid}" data-i="${k}" aria-label="播放" title="播放">🔊</button></div>`;
+    <span class="vfbtn">${vfCanHow(vid, k) ? `<button type="button" class="ibtn s vfq${vfHow[key]?' on':''}" data-act="vfhow" data-k="${key}" aria-label="怎麼變" title="怎麼變（會顯示答案）">❓</button>` : ''}<button class="ibtn s" data-act="play" data-d="${vid}" data-i="${k}" aria-label="播放" title="播放">🔊</button></span>${vfHow[key] ? vfHowHTML(vid, k) : ''}</div>`;
+}
+/* v3.50 ❓ 怎麼變：點了才顯示（含這個字的答案），只存在記憶體 */
+const vfHow = {};
+function vfKind(d){ return d && d.vk && d.vg && window.VRule ? VRule.kindOf(d.vk, d.vg, d.vw) : null; }
+function vfCanHow(vid, k){ const d = DLG[vid]; return !!(vfKind(d) && VRule.keyOf(d.lines[k].lab)); }
+function vfHowHTML(vid, k){
+  const d = DLG[vid], ln = d.lines[k], key = VRule.keyOf(ln.lab), e = key && VRule.explain(d.vk, d.vg, key, d.vw, ln.kana); if(!e) return '';
+  const c = e.chg, der = key === 'dict' ? `<div class="vfhd">這就是原形：${furiHTML(d.vfu)}（${esc(d.vk)}）</div>`
+    : `<div class="vfhd">${furiHTML(d.vfu)} → ${furiHTML(ln.furi)}${c.stem ? `<span class="vfhc">（…${esc(c.a)} → <b class="vfchg">${esc(c.b)}</b>）</span>` : ''}</div>`;
+  return `<div class="vfhow"><div class="vfhr"><b>${esc(e.gname)}・${esc(e.name)}</b>：${esc(e.rule)}</div>${e.spec ? `<div class="vfhs">👉 ${esc(e.spec)}</div>` : ''}${der}${e.irr ? `<div class="vfhi">⚠ ${esc(e.irr)}</div>` : ''}</div>`;
+}
+function vfRulesHTML(vid){
+  const kind = vfKind(DLG[vid]); if(!kind) return '';
+  const ex = VRule.EX[kind], rows = VRule.table(kind);
+  return `<details class="vfrules"><summary>📘 變化規則總表（${esc(VRule.GNAME[kind])}・例字 ${furiHTML(ex[2])}）</summary>
+    <div class="vfrnote small mute">用別的字當例子，不會看到這個字的答案。${kind === 'suru' || kind === 'kuru' ? 'III 類只有「する」和「来（く）る」兩個，要整個背起來。' : kind === 'ichidan' ? 'II 類最簡單：去掉る，再接上後面的部分。' : 'I 類看最後一個字（う段）換成同一行的あ・い・え・お段。'}</div>
+    <div class="vfrtab">${rows.map(r => `<div class="vfrr"><span class="vfrn">${esc(r.name)}</span><span class="vfrd">${esc(r.rule)}<span class="vfrex">例：${furiHTML(r.ex)}</span></span></div>`).join('')}</div></details>`;
 }
 function vfDetailsHTML(vid, glab){
   const d = DLG[vid]; if(!d) return '';
   const all = d.lines.every((_, k) => vfReveal[vid+':'+k]);
   return `<details class="vfd" data-j="${vid}"><summary class="vfsum">🔤 動詞變化・聽力練習 <span class="vfg">${esc(glab)}・${d.lines.length} 種</span></summary>
-    <div class="vfbar"><button type="button" class="btn sm" data-act="vfall" data-j="${vid}">▶ 依序播放</button><button type="button" class="btn sm ghost" data-act="vfshow" data-j="${vid}">${all?'🙈 全部隱藏':'👁 全部顯示'}</button><span class="small mute">先聽，再點灰條看答案</span></div>
-    <div class="vflist">${vfGroups(d).map(g => `<div class="vfgrp"><div class="vfgh">${esc(g.t)}</div>${g.ks.map(k => vfRowHTML(vid, k)).join('')}</div>`).join('')}</div></details>`;
+    <div class="vfbar"><button type="button" class="btn sm" data-act="vfall" data-j="${vid}">▶ 依序播放</button><button type="button" class="btn sm ghost" data-act="vfshow" data-j="${vid}">${all?'🙈 全部隱藏':'👁 全部顯示'}</button><span class="small mute">先聽，再點灰條看答案；不懂怎麼變按 ❓</span></div>
+    ${vfRulesHTML(vid)}<div class="vflist">${vfGroups(d).map(g => `<div class="vfgrp"><div class="vfgh">${esc(g.t)}</div>${g.ks.map(k => vfRowHTML(vid, k)).join('')}</div>`).join('')}</div></details>`;
 }
 /* v3.49 動詞變化依「組」排：每組由上往下讀（普通形 4 種 → 禮貌形 4 種 → …），依序播放也照這個順序；音檔編號不變 */
 const VF_GRP = [['普通形（現在・過去／肯定・否定）', /^(辭書形|ない形|た形|なかった形)/], ['禮貌形（ます形）', /^(ます形|ません|ました|ませんでした)/],
@@ -307,7 +324,7 @@ function myRegister(){
     if(b && b.ex && b.ex.length) DLG['mye_'+id] = {id:'mye_'+id, l:0, mine:true, myEx:true, myId:id, tts:false, title:'我的單語例句', scene:'', sp,
       lines: b.ex.map((e, k) => ({s:'A', ja:e.ja, furi:e.furi||'', kana:e.kana||'', zh:e.zh||'', say:e.ja, ex:k+1, w:id, g:[], v:[]}))};
     const g = MY_G[it.pos], forms = g && window.MineCore ? MineCore.conjugate(it.ja, it.kana, g) : null;
-    if(forms && forms.length) DLG['myf_'+id] = {id:'myf_'+id, l:0, mine:true, myForms:true, myId:id, tts: !(b && b.nf === forms.length && b.g === g), title:ja+' 動詞變化', scene:'', sp,
+    if(forms && forms.length) DLG['myf_'+id] = {id:'myf_'+id, l:0, mine:true, myForms:true, myId:id, vg:g, vw:forms[0][2], vk:forms[0][3], vfu:forms[0][1], tts: !(b && b.nf === forms.length && b.g === g), title:ja+' 動詞變化', scene:'', sp,
       lines: forms.map(f => ({s:'A', ja:f[2], furi:f[1], kana:f[3], zh:f[0], say:f[3], lab:f[0], g:[], v:[]}))};
   });
 }
@@ -2285,6 +2302,7 @@ document.addEventListener('click', e => {
   if(/^bm(|upd|del|cancel|rv|go)$/.test(act)){ e.preventDefault(); e.stopPropagation(); bmAct(act, b); return; }
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
   else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(k.split(':')[0]); }
+  else if(act==='vfhow'){ const k = b.dataset.k; if(vfHow[k]) delete vfHow[k]; else vfHow[k] = 1; vfRerender(k.split(':')[0]); }
   else if(act==='vfshow'){ const j = b.dataset.j; vfSetAll(j, !DLG[j].lines.every((_, k) => vfReveal[j+':'+k])); }
   else if(act==='vfall'){ const j = b.dataset.j, d = DLG[j]; if(curPlaying && curPlaying.startsWith(j+':')){ stopAll(); setPlaying(null); } else playSeq(d, vfOrder(d), 600); }
   else if(act==='rep'){ playSeq(DLG[b.dataset.d], [+b.dataset.i], 900, 3); toast('重複 3 次'); }
@@ -2411,7 +2429,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 ${APP_VER}（顯示出來的日文、假名、中文可以選取複製，按 📋 複製整句；動詞變化改成一組一組由上往下排：普通形 → 禮貌形 → …）</div>
+  <div class="foot">版本 ${APP_VER}（動詞變化每一列加上 ❓ 怎麼變：說明規則和這個字怎麼變過來；上方有 📘 變化規則總表。顯示出來的文字可以選取複製）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();

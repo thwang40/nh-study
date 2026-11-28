@@ -1078,3 +1078,21 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 rt,rp{-webkit-user-select:none;user-select:none}
 .cpyb{font:inherit;font-size:12px;line-height:1;margin-left:6px;padding:2px 6px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--mute);cursor:pointer;vertical-align:middle;white-space:nowrap;-webkit-user-select:none;user-select:none;text-indent:0;font-weight:400}
 .cpyb.done{color:var(--teal,#2f7a6b);border-color:#9fcfbf;background:#f2fbf7}
+
+/* v3.50 ❓ 怎麼變／📘 變化規則總表 */
+.vfbtn{display:flex;gap:2px;align-items:center}
+.vfq{font-size:13px}
+.vfq.on{background:#fff7dc;border-color:#e6cf86}
+.vfhow{grid-column:1/-1;margin:2px 0 2px;padding:7px 9px;border-radius:7px;background:#fbf8ee;border:1px dashed #e2d6ae;font-size:13px;line-height:1.55;color:#44503f;-webkit-user-select:text;user-select:text}
+.vfhow > div + div{margin-top:3px}
+.vfhd{font-size:15px;color:#2f3b2b}
+.vfhc{font-size:12px;color:#6b7a66;margin-left:4px}
+.vfchg{color:#c62828;font-weight:700}
+.vfhi{color:#8a5a00}
+details.vfrules{margin:0 8px 10px;border:1px solid #ece9df;border-radius:8px;background:#fff}
+details.vfrules > summary{cursor:pointer;padding:7px 10px;font-size:13px;font-weight:600;color:#3d5a3a}
+.vfrnote{padding:0 10px 6px}
+.vfrtab{display:flex;flex-direction:column;padding:0 10px 8px;-webkit-user-select:text;user-select:text}
+.vfrr{display:grid;grid-template-columns:6.5em minmax(0,1fr);gap:8px;padding:5px 0;border-top:1px solid #f0ede4;font-size:13px;line-height:1.5}
+.vfrn{font-weight:700;color:#3d5a3a}
+.vfrex{display:block;color:#2f3b2b;font-size:14px}
