@@ -907,8 +907,10 @@ details.vfd > summary.vfsum::before{content:'▸';display:inline-block;margin-ri
 details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .vfg{font-weight:400;font-size:12px;color:#6b7a66;margin-left:4px}
 .vfbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 12px 8px}
-.vflist{display:grid;grid-template-columns:1fr;gap:4px;padding:0 8px 10px}
+.vflist{display:grid;grid-template-columns:1fr;gap:10px;padding:0 8px 10px;align-items:start}
 @media (min-width:760px){ .vflist{grid-template-columns:1fr 1fr} }
+.vfgrp{display:flex;flex-direction:column;gap:4px;min-width:0}
+.vfgh{font-size:12px;font-weight:700;color:#3d5a3a;padding:2px 4px 0}
 .vfrow{display:grid;grid-template-columns:minmax(0,9.5em) minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;background:#fff;border:1px solid #ece9df}
 .vfrow.playing{border-color:#2e7d32;background:#eef6ea}
 .vflab{font-size:12px;color:#5e6b59;line-height:1.3}
@@ -1069,3 +1071,10 @@ details.vfd[open] > summary.vfsum::before{transform:rotate(90deg)}
 .mytag{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:12px;padding:3px 8px;cursor:pointer;color:var(--ink,#1f2a1f)}
 .mytag.on{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:700}
 @media (max-width:560px){ .mygrp .mygpr{margin-left:0} }
+
+/* v3.49 複製文字：顯示後的文字可選取（電腦拖曳、手機長按）；遮住的部分不能選；振り仮名不會被一起複製 */
+.stext,.lrv,.vftx,.rptext,.sbody,.dtext,.bmrev,.line .ja,.line .kana,.line .zh{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+.masked,.masked *,.mask,.hiddenText{-webkit-user-select:none;user-select:none}
+rt,rp{-webkit-user-select:none;user-select:none}
+.cpyb{font:inherit;font-size:12px;line-height:1;margin-left:6px;padding:2px 6px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--mute);cursor:pointer;vertical-align:middle;white-space:nowrap;-webkit-user-select:none;user-select:none;text-indent:0;font-weight:400}
+.cpyb.done{color:var(--teal,#2f7a6b);border-color:#9fcfbf;background:#f2fbf7}

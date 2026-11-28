@@ -2,7 +2,7 @@
 'use strict';
 const B = window.BOOK;
 const $ = s => document.querySelector(s);
-const APP_VER = '3.48';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
+const APP_VER = '3.49';   // 版本號：頂端列、頁尾、有新版本提示都用這個（要和 sw.js、version.json 一致）
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_KEY = 'bunkaListen.v2'; // v2：內容改為依使用者課本 PDF 重建，舊進度不沿用
 const S = Object.assign({speed:1, engine:'mp3', listenFirst:true, showKana:true, done:{}, quiz:{}, review:{}, unf:{}}, safeParse(localStorage.getItem(LS_KEY)));
@@ -136,8 +136,20 @@ function vfDetailsHTML(vid, glab){
   const all = d.lines.every((_, k) => vfReveal[vid+':'+k]);
   return `<details class="vfd" data-j="${vid}"><summary class="vfsum">🔤 動詞變化・聽力練習 <span class="vfg">${esc(glab)}・${d.lines.length} 種</span></summary>
     <div class="vfbar"><button type="button" class="btn sm" data-act="vfall" data-j="${vid}">▶ 依序播放</button><button type="button" class="btn sm ghost" data-act="vfshow" data-j="${vid}">${all?'🙈 全部隱藏':'👁 全部顯示'}</button><span class="small mute">先聽，再點灰條看答案</span></div>
-    <div class="vflist">${d.lines.map((_, k) => vfRowHTML(vid, k)).join('')}</div></details>`;
+    <div class="vflist">${vfGroups(d).map(g => `<div class="vfgrp"><div class="vfgh">${esc(g.t)}</div>${g.ks.map(k => vfRowHTML(vid, k)).join('')}</div>`).join('')}</div></details>`;
 }
+/* v3.49 動詞變化依「組」排：每組由上往下讀（普通形 4 種 → 禮貌形 4 種 → …），依序播放也照這個順序；音檔編號不變 */
+const VF_GRP = [['普通形（現在・過去／肯定・否定）', /^(辭書形|ない形|た形|なかった形)/], ['禮貌形（ます形）', /^(ます形|ません|ました|ませんでした)/],
+  ['て形（て形・ている）', /^(て形|ている)/], ['た〜（たい：想要～）', /^たい/], ['邀約・意向（〜ましょう／〜よう）', /^(ましょう|意向形)/], ['可能・假定・命令・禁止', /^(可能形|ば形|命令形|禁止形)/],
+  ['被動・使役', /^(受身形|使役形|使役受身形)/]];
+function vfGroups(d){
+  const used = new Set(), out = [];
+  VF_GRP.forEach(([t, re]) => { const ks = d.lines.map((ln, k) => k).filter(k => !used.has(k) && re.test(d.lines[k].lab || d.lines[k].zh || ''));
+    if(ks.length){ ks.forEach(k => used.add(k)); out.push({t, ks}); } });
+  const rest = d.lines.map((_, k) => k).filter(k => !used.has(k)); if(rest.length) out.push({t: '其他', ks: rest});
+  return out;
+}
+function vfOrder(d){ return vfGroups(d).flatMap(g => g.ks); }
 function vfBlockHTML(n, no){
   const j = vfJ(n, no); if(j === undefined || !DLG['vf'+j]) return '';
   const v = B.vf[j]; return vfDetailsHTML('vf'+j, VF_GL[v.g]||v.g);
@@ -2212,6 +2224,58 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('keydown', e => { if(RPS && e.key==='Escape') rpClose(); });
 
+/* ---------------- 複製文字（v3.49） ----------------
+   顯示出來的日文／假名／中文可以選取、長按複製；選字（拖曳、長按）時不會切換顯示或播放。
+   顯示後的句子多一個小小的 📋：複製「日文（不含振り仮名）＋假名＋已顯示的中文」。還沒顯示的句子沒有文字，也沒有 📋。 */
+const CPY_SEL = '[data-act="rv"]:not(button):not(.masked),[data-act="vfrv"]:not(.masked),[data-act="rprv"]:not(.masked),[data-sact="rv"],.dtext,.bmrev';
+const CPY_GUARD = '[data-act="rv"]:not(button),[data-act="vfrv"],[data-act="rprv"],[data-sact="rv"],.lrv';
+function cpyClean(el){ const c = el.cloneNode(true); c.querySelectorAll('rt,rp,.cpyb,.sr,.mask,.swho,.mypos,.stag').forEach(x => x.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); }
+function cpyText(box){
+  const out = []; ['.ja', '.kana', '.zh'].forEach(q => { const el = box.querySelector(q); if(el){ const t = cpyClean(el); if(t && !out.includes(t)) out.push(t); } });
+  return out.join('\n');
+}
+function cpyDecorate(root){
+  (root || document).querySelectorAll(CPY_SEL).forEach(box => {
+    if(box.querySelector(':scope > .cpyb, :scope > * > .cpyb') || !box.querySelector('.ja')) return;
+    const parts = box.querySelectorAll('.ja,.kana,.zh'); const last = parts[parts.length - 1]; if(!last) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cpyb'; b.dataset.cpy = '1';
+    b.setAttribute('aria-label', '複製這句（日文、假名、中文）'); b.title = '複製這句'; b.textContent = '📋';
+    last.appendChild(b);
+  });
+}
+async function cpyWrite(t){
+  try{ if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(t); return true; } }catch(e){}
+  const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+  document.body.appendChild(ta); ta.select(); let ok = false; try{ ok = document.execCommand('copy'); }catch(e){} ta.remove(); return ok;
+}
+let cpyDown = null;
+window.addEventListener('pointerdown', e => { cpyDown = {t: Date.now(), x: e.clientX, y: e.clientY}; }, true);
+window.addEventListener('click', async e => {
+  const cb = e.target.closest && e.target.closest('.cpyb');
+  if(cb){ e.preventDefault(); e.stopImmediatePropagation();
+    const box = cb.closest(CPY_SEL.replace(/:not\(\.masked\)/g, '')) || cb.parentElement.parentElement;
+    const ok = await cpyWrite(cpyText(box));
+    cb.textContent = ok ? '✓ 已複製' : '✕ 無法複製'; cb.classList.add('done'); clearTimeout(cb._t); cb._t = setTimeout(() => { cb.textContent = '📋'; cb.classList.remove('done'); }, 1500);
+    return; }
+  const g = e.target.closest && e.target.closest(CPY_GUARD); if(!g || e.target.closest('button,a,input,label,select')) return;
+  const sel = window.getSelection && window.getSelection();
+  const selecting = sel && !sel.isCollapsed && sel.toString().trim() && (g.contains(sel.anchorNode) || g.contains(sel.focusNode));
+  const d = cpyDown, longp = d && (Date.now() - d.t > 600 || Math.abs(e.clientX - d.x) > 10 || Math.abs(e.clientY - d.y) > 10);
+  if(selecting || longp || e.detail > 1){ e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+// 複製選取的文字時，振り仮名（rt）不要重複出現
+document.addEventListener('copy', e => {
+  const sel = window.getSelection(); if(!sel || sel.isCollapsed || !sel.rangeCount) return;
+  const frag = document.createElement('div'); for(let i = 0; i < sel.rangeCount; i++) frag.appendChild(sel.getRangeAt(i).cloneContents());
+  if(!frag.querySelector('rt,rp,.cpyb,.sr,.mask')) return;
+  frag.querySelectorAll('rt,rp,.cpyb,.sr,.mask').forEach(x => x.remove());
+  frag.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre-wrap'; document.body.appendChild(frag);
+  const t = (frag.innerText || frag.textContent).replace(/\n{2,}/g, '\n').trim(); frag.remove();
+  if(e.clipboardData){ e.clipboardData.setData('text/plain', t); e.preventDefault(); }
+});
+new MutationObserver(ms => { if(ms.some(m => m.addedNodes.length)) cpyDecorate(); }).observe(document.body, {childList: true, subtree: true});
+document.addEventListener('DOMContentLoaded', () => cpyDecorate());
+
 /* ---------------- global clicks ---------------- */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if(!b) return;
@@ -2222,7 +2286,7 @@ document.addEventListener('click', e => {
   if(act==='play'){ playLine(DLG[b.dataset.d], +b.dataset.i); }
   else if(act==='vfrv'){ const k = b.dataset.k; if(vfReveal[k]) delete vfReveal[k]; else vfReveal[k] = 1; vfRerender(k.split(':')[0]); }
   else if(act==='vfshow'){ const j = b.dataset.j; vfSetAll(j, !DLG[j].lines.every((_, k) => vfReveal[j+':'+k])); }
-  else if(act==='vfall'){ const j = b.dataset.j, d = DLG[j]; if(curPlaying && curPlaying.startsWith(j+':')){ stopAll(); setPlaying(null); } else playSeq(d, d.lines.map((_, k) => k), 600); }
+  else if(act==='vfall'){ const j = b.dataset.j, d = DLG[j]; if(curPlaying && curPlaying.startsWith(j+':')){ stopAll(); setPlaying(null); } else playSeq(d, vfOrder(d), 600); }
   else if(act==='rep'){ playSeq(DLG[b.dataset.d], [+b.dataset.i], 900, 3); toast('重複 3 次'); }
   else if(act==='rv'){ if(e.target.closest('.bmbtn,.bmask,.texbmb')) return; const k = b.dataset.k; reveal[k] = ((reveal[k]||0)+1) % 3; const [id,i] = k.split(':'); rerenderLine(DLG[id], +i, current&&current.type==='review'?{review:true,showId:true}:{}); }
   else if(act==='idk'){
@@ -2347,7 +2411,7 @@ async function openSettings(){
     <div><b>重設</b><div class="row" style="margin-top:6px"><button class="btn sm ghost" id="rsReview">清空複習清單</button><button class="btn sm ghost" id="rsAll">清除所有進度</button></div></div>
   </div>
   ${window.NhSync && NhSync.configReady() ? NhSync.panelHTML('settings') : ''}
-  <div class="foot">版本 ${APP_VER}（本文、文型、逐句、開口練習、場合使用裡用「何・どこ・いつ…」的問句，句尾上揚改得更明顯，共 822 句）</div>
+  <div class="foot">版本 ${APP_VER}（顯示出來的日文、假名、中文可以選取複製，按 📋 複製整句；動詞變化改成一組一組由上往下排：普通形 → 禮貌形 → …）</div>
   <div class="row" style="margin-top:10px"><button class="btn" id="closeS">完成</button></div>`;
   $('#sheet').classList.remove('hidden');
   $('#cacheInfo').innerHTML = await cacheStatus();
